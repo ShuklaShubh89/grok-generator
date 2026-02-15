@@ -122,8 +122,17 @@
 
 .subtitle {
   color: #888;
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+
+.login-key-note {
+  margin: 0 0 1.5rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(100, 108, 255, 0.12);
+  border-radius: 6px;
+  border-left: 3px solid #646cff;
 }
 
 .form {
