@@ -29,8 +29,6 @@ Open [http://localhost:5173](http://localhost:5173). You’ll be asked to log in
 
 - `npm run build` — Build for production (output in `dist/`).
 - `npm run preview` — Serve the production build locally.
-- `npm run dev:vercel` — Run with [Vercel CLI](https://vercel.com/docs/cli) (uses Vercel’s proxy if configured).
-
 ## How to use
 
 1. **Log in**  

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-// Proxy for imgen.x.ai and vidgen.x.ai when using `npm run dev` (vite). For production mirror run `npm run dev:vercel` (vercel dev).
+// Proxy for imgen.x.ai and vidgen.x.ai when using `npm run dev` (vite).
 const PROXY_ALLOWED = ['https://imgen.x.ai/', 'https://vidgen.x.ai/'];
 export default defineConfig({
   plugins: [
