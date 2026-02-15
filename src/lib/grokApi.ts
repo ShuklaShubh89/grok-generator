@@ -11,10 +11,10 @@ const getApiKey = () => {
 const getBaseUrl = () =>
   import.meta.env.VITE_GROK_API_URL ?? "https://api.x.ai/v1";
 
-/** Custom fetch so requests to imgen.x.ai go via our dev proxy (avoids CORS). */
+/** Custom fetch so requests to imgen.x.ai and vidgen.x.ai go via our proxy (avoids CORS). */
 function grokFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
-  if (url.startsWith("https://imgen.x.ai/")) {
+  if (url.startsWith("https://imgen.x.ai/") || url.startsWith("https://vidgen.x.ai/")) {
     const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     return fetch(proxyUrl, init);
   }
