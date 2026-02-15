@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/xai": "^3.0.57",
+    "@vercel/analytics": "^1.6.1",
     "ai": "^6.0.86",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
