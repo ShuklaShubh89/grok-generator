@@ -33,7 +33,6 @@ export default function ImageToVideo() {
     try {
       const url = await imageToVideo(prompt.trim(), preview, {
         duration: 5,
-        aspectRatio: "16:9",
         resolution: "480p",
       });
       setResultUrl(url);

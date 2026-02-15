@@ -80,9 +80,10 @@ export async function imageToVideo(
       text: prompt,
     },
     duration: options?.duration ?? 5,
-    aspectRatio:
-      (options?.aspectRatio as "16:9" | "1:1" | "9:16" | "4:3" | "3:4" | "3:2" | "2:3") ??
-      "16:9",
+    // Omit aspectRatio so the API uses the input image's aspect ratio (xAI default for image-to-video).
+    ...(options?.aspectRatio != null && {
+      aspectRatio: options.aspectRatio as "16:9" | "1:1" | "9:16" | "4:3" | "3:4" | "3:2" | "2:3",
+    }),
     resolution:
       options?.resolution === "720p"
         ? "1280x720"
