@@ -9,10 +9,27 @@ import {
 export default function AutoSaveSettings() {
   const [enabled, setEnabled] = useState(false);
   const [supported, setSupported] = useState(true);
+  const [showRefreshWarning, setShowRefreshWarning] = useState(false);
 
   useEffect(() => {
     setSupported(isAutoSaveSupported());
-    setEnabled(isAutoSaveEnabled());
+    const currentlyEnabled = isAutoSaveEnabled();
+    setEnabled(currentlyEnabled);
+
+    // Check if auto-save was previously enabled but handle is lost
+    const wasEnabled = localStorage.getItem('autoSaveEnabled') === 'true';
+    if (wasEnabled && !currentlyEnabled) {
+      setShowRefreshWarning(true);
+      // Clear the warning after showing it once
+      setTimeout(() => setShowRefreshWarning(false), 10000);
+    }
+
+    // Refresh enabled state periodically in case it was disabled due to lost handle
+    const interval = setInterval(() => {
+      setEnabled(isAutoSaveEnabled());
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleToggle = async () => {
@@ -70,7 +87,13 @@ export default function AutoSaveSettings() {
           <span>{enabled ? "Enabled" : "Disabled"}</span>
         </label>
       </div>
-      
+
+      {showRefreshWarning && (
+        <div className="auto-save-warning">
+          <p>⚠️ Auto-save was disabled due to page refresh. Please re-enable it to continue auto-saving.</p>
+        </div>
+      )}
+
       {enabled ? (
         <div className="auto-save-info">
           <p className="auto-save-status">

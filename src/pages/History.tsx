@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getHistory, deleteHistoryItem, deleteHistoryItems, clearHistory, type HistoryItem } from "../lib/history";
+import ModerationStats from "../components/ModerationStats";
 
 export default function History() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -118,6 +119,8 @@ export default function History() {
           </div>
         )}
       </div>
+
+      <ModerationStats />
 
       {selectionMode && history.length > 0 && (
         <div className="selection-toolbar">

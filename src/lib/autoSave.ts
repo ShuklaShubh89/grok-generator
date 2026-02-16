@@ -41,9 +41,10 @@ export async function selectAutoSaveFolder(): Promise<boolean> {
 
 /**
  * Check if auto-save is currently enabled
+ * Only returns true if we have an active directory handle
  */
 export function isAutoSaveEnabled(): boolean {
-  return directoryHandle !== null || localStorage.getItem('autoSaveEnabled') === 'true';
+  return directoryHandle !== null;
 }
 
 /**
@@ -56,24 +57,21 @@ export function disableAutoSave(): void {
 
 /**
  * Get the current auto-save directory handle
- * If not set, prompt user to select one
+ * Returns null if not available (doesn't prompt user)
  */
 async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
   if (directoryHandle) {
     return directoryHandle;
   }
-  
+
   // If auto-save was enabled before but handle is lost (page refresh),
-  // prompt user to select folder again
+  // silently disable it - user must manually re-enable
+  // This prevents the "user gesture" error when trying to show picker after async operations
   if (localStorage.getItem('autoSaveEnabled') === 'true') {
-    const success = await selectAutoSaveFolder();
-    if (!success) {
-      disableAutoSave();
-      return null;
-    }
-    return directoryHandle;
+    console.warn('Auto-save folder handle lost (page refresh). Please re-enable auto-save in settings.');
+    disableAutoSave();
   }
-  
+
   return null;
 }
 

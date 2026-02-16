@@ -1,3 +1,5 @@
+import { PRICING, calculateImageCost, calculateVideoCost } from "../lib/pricing";
+
 interface CostEstimatorProps {
   type: "image" | "video";
   // For images
@@ -5,26 +7,8 @@ interface CostEstimatorProps {
   imageCount?: number;
   // For videos
   duration?: number;
-  resolution?: "360p" | "480p" | "720p";
+  resolution?: "480p" | "720p";
 }
-
-// Pricing constants (in USD)
-const PRICING = {
-  image: {
-    "grok-imagine-image": 0.02,
-    "grok-imagine-image-pro": 0.07,
-  },
-  video: {
-    // Base price per second
-    basePerSecond: 0.01,
-    // Resolution multipliers
-    resolution: {
-      "360p": 0.55, // 45% discount
-      "480p": 1.0,  // baseline
-      "720p": 1.8,  // 80% premium
-    },
-  },
-};
 
 export default function CostEstimator({
   type,
@@ -35,13 +19,9 @@ export default function CostEstimator({
 }: CostEstimatorProps) {
   const calculateCost = (): number => {
     if (type === "image") {
-      const pricePerImage = PRICING.image[model];
-      return pricePerImage * imageCount;
+      return calculateImageCost(model, imageCount);
     } else {
-      // Video cost calculation
-      const basePrice = PRICING.video.basePerSecond * duration;
-      const resolutionMultiplier = PRICING.video.resolution[resolution];
-      return basePrice * resolutionMultiplier;
+      return calculateVideoCost(duration, resolution);
     }
   };
 
@@ -56,23 +36,26 @@ export default function CostEstimator({
       <div className="cost-estimator-details">
         {type === "image" ? (
           <>
-            <span className="cost-detail">
-              {imageCount} image{imageCount > 1 ? "s" : ""} × ${PRICING.image[model].toFixed(2)}
-            </span>
-            {model === "grok-imagine-image-pro" && (
-              <span className="cost-detail-note">Pro model (3.5× standard)</span>
+            {model === "grok-imagine-image" ? (
+              <span className="cost-detail">
+                {imageCount} image{imageCount > 1 ? "s" : ""} × ($0.002 input + $0.02 output) = ${(PRICING.image[model].total * imageCount).toFixed(3)}
+              </span>
+            ) : (
+              <>
+                <span className="cost-detail">
+                  {imageCount} image{imageCount > 1 ? "s" : ""} × ${PRICING.image[model].toFixed(2)}
+                </span>
+                <span className="cost-detail-note">Pro model (3.2× standard)</span>
+              </>
             )}
           </>
         ) : (
           <>
             <span className="cost-detail">
-              {duration}s video @ {resolution}
+              Image input: ${PRICING.video.imageInput.toFixed(3)} + {duration}s @ ${PRICING.video.perSecond[resolution].toFixed(2)}/s ({resolution})
             </span>
-            {resolution === "360p" && (
-              <span className="cost-detail-note">45% savings vs 480p</span>
-            )}
             {resolution === "720p" && (
-              <span className="cost-detail-note">80% premium vs 480p</span>
+              <span className="cost-detail-note">720p is 40% more expensive than 480p</span>
             )}
           </>
         )}

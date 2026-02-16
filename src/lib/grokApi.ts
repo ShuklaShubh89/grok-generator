@@ -1,12 +1,16 @@
 import { createXai } from "@ai-sdk/xai";
 import { generateImage } from "ai";
 import { experimental_generateVideo as generateVideo } from "ai";
+import { trackModerationEvent, isModerationError } from "./moderationTracking";
+import { syncApiKey as syncTextModerationApiKey } from "./grokTextModeration";
 
 let userApiKey: string | null = null;
 
 /** Set the API key from the UI input (overrides env). Pass null to clear. */
 export function setGrokApiKey(key: string | null): void {
   userApiKey = key?.trim() || null;
+  // Sync with text moderation module
+  syncTextModerationApiKey(userApiKey);
 }
 
 function getApiKey(): string {
@@ -169,6 +173,9 @@ export async function imageEdit(
   imageDataUri: string,
   options?: { model?: "grok-imagine-image" | "grok-imagine-image-pro"; count?: number }
 ): Promise<string[]> {
+  const modelName = options?.model ?? "grok-imagine-image";
+  const imageCount = options?.count ?? 1;
+
   try {
     // Compress image before sending to API to reduce costs
     const compressed = await compressImage(imageDataUri, 1024, 0.85);
@@ -176,9 +183,6 @@ export async function imageEdit(
     const imageInput = compressed.startsWith("http")
       ? new Uint8Array(await (await fetch(compressed)).arrayBuffer())
       : dataUriToUint8Array(compressed);
-
-    const modelName = options?.model ?? "grok-imagine-image";
-    const imageCount = options?.count ?? 1;
 
     const { images } = await generateImage({
       model: getXai().image(modelName),
@@ -190,9 +194,34 @@ export async function imageEdit(
     });
 
     if (!images || images.length === 0) throw new Error("No images in response");
+
+    // Track successful generation
+    trackModerationEvent({
+      type: 'image',
+      prompt,
+      inputImage: imageDataUri,
+      moderated: false,
+      model: modelName,
+      metadata: { count: imageCount },
+    });
+
     return images.map((img) => `data:${img.mediaType};base64,${img.base64}`);
   } catch (err) {
-    throw new Error(getErrorMessage(err));
+    const errorMessage = getErrorMessage(err);
+    const moderated = isModerationError(errorMessage);
+
+    // Track moderation event
+    trackModerationEvent({
+      type: 'image',
+      prompt,
+      inputImage: imageDataUri,
+      moderated,
+      errorMessage,
+      model: modelName,
+      metadata: { count: imageCount },
+    });
+
+    throw new Error(errorMessage);
   }
 }
 
@@ -214,13 +243,11 @@ export async function imageToVideo(
       : dataUriToUint8Array(compressed);
 
     // Map resolution options to actual dimensions
+    // Supported resolutions: 480p (854x480) and 720p (1280x720)
     let resolutionDimensions: `${number}x${number}`;
     switch (options?.resolution) {
       case "720p":
         resolutionDimensions = "1280x720";
-        break;
-      case "360p":
-        resolutionDimensions = "640x360";
         break;
       case "480p":
       default:
@@ -251,8 +278,39 @@ export async function imageToVideo(
 
     const first = videos?.[0];
     if (!first) throw new Error("No video in response");
+
+    // Track successful generation
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: imageDataUri,
+      moderated: false,
+      model: 'grok-imagine-video',
+      metadata: {
+        duration: options?.duration ?? 3,
+        resolution: options?.resolution ?? '480p',
+      },
+    });
+
     return `data:${first.mediaType};base64,${first.base64}`;
   } catch (err) {
-    throw new Error(getErrorMessage(err));
+    const errorMessage = getErrorMessage(err);
+    const moderated = isModerationError(errorMessage);
+
+    // Track moderation event
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: imageDataUri,
+      moderated,
+      errorMessage,
+      model: 'grok-imagine-video',
+      metadata: {
+        duration: options?.duration ?? 3,
+        resolution: options?.resolution ?? '480p',
+      },
+    });
+
+    throw new Error(errorMessage);
   }
 }
