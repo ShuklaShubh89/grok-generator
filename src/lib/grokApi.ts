@@ -67,6 +67,46 @@ function dataUriToUint8Array(dataUri: string): Uint8Array {
   return arr;
 }
 
+/**
+ * Compress an image to reduce file size and API costs.
+ * Resizes to maxWidth if larger, and compresses to JPEG with specified quality.
+ */
+async function compressImage(
+  dataUri: string,
+  maxWidth = 1024,
+  quality = 0.85
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+
+      // Resize if too large
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Failed to get canvas context"));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to JPEG with compression
+      const compressed = canvas.toDataURL("image/jpeg", quality);
+      resolve(compressed);
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = dataUri;
+  });
+}
+
 /** Extract a user-facing message from API errors (e.g. content moderation, rate limits, credits). */
 function getErrorMessage(err: unknown): string {
   // SDK RetryError: "Failed after 3 attempts. Last error: ..." — use the last underlying error
@@ -121,29 +161,36 @@ function getErrorMessage(err: unknown): string {
 }
 
 /**
- * Image edit: send image (data URI or URL) + prompt, returns image as data URL.
- * Uses Grok SDK (generateImage with grok-imagine-image).
+ * Image edit: send image (data URI or URL) + prompt, returns image(s) as data URL(s).
+ * Uses Grok SDK (generateImage with grok-imagine-image or grok-imagine-image-pro).
  */
 export async function imageEdit(
   prompt: string,
-  imageDataUri: string
-): Promise<string> {
+  imageDataUri: string,
+  options?: { model?: "grok-imagine-image" | "grok-imagine-image-pro"; count?: number }
+): Promise<string[]> {
   try {
-    const imageInput = imageDataUri.startsWith("http")
-      ? new Uint8Array(await (await fetch(imageDataUri)).arrayBuffer())
-      : dataUriToUint8Array(imageDataUri);
+    // Compress image before sending to API to reduce costs
+    const compressed = await compressImage(imageDataUri, 1024, 0.85);
+
+    const imageInput = compressed.startsWith("http")
+      ? new Uint8Array(await (await fetch(compressed)).arrayBuffer())
+      : dataUriToUint8Array(compressed);
+
+    const modelName = options?.model ?? "grok-imagine-image";
+    const imageCount = options?.count ?? 1;
 
     const { images } = await generateImage({
-      model: getXai().image("grok-imagine-image"),
+      model: getXai().image(modelName),
       prompt: {
         text: prompt,
         images: [imageInput],
       },
+      n: imageCount,
     });
 
-    const first = images?.[0];
-    if (!first) throw new Error("No image in response");
-    return `data:${first.mediaType};base64,${first.base64}`;
+    if (!images || images.length === 0) throw new Error("No images in response");
+    return images.map((img) => `data:${img.mediaType};base64,${img.base64}`);
   } catch (err) {
     throw new Error(getErrorMessage(err));
   }
@@ -159,9 +206,27 @@ export async function imageToVideo(
   options?: { duration?: number; aspectRatio?: string; resolution?: string }
 ): Promise<string> {
   try {
-    const imageInput = imageDataUri.startsWith("http")
-      ? imageDataUri
-      : dataUriToUint8Array(imageDataUri);
+    // Compress image before sending to API to reduce costs
+    const compressed = await compressImage(imageDataUri, 1024, 0.85);
+
+    const imageInput = compressed.startsWith("http")
+      ? compressed
+      : dataUriToUint8Array(compressed);
+
+    // Map resolution options to actual dimensions
+    let resolutionDimensions: `${number}x${number}`;
+    switch (options?.resolution) {
+      case "720p":
+        resolutionDimensions = "1280x720";
+        break;
+      case "360p":
+        resolutionDimensions = "640x360";
+        break;
+      case "480p":
+      default:
+        resolutionDimensions = "854x480";
+        break;
+    }
 
     const { videos } = await generateVideo({
       model: getXai().video("grok-imagine-video"),
@@ -169,15 +234,12 @@ export async function imageToVideo(
         image: imageInput,
         text: prompt,
       },
-      duration: options?.duration ?? 5,
+      duration: options?.duration ?? 3,
       // Omit aspectRatio so the API uses the input image's aspect ratio (xAI default for image-to-video).
       ...(options?.aspectRatio != null && {
         aspectRatio: options.aspectRatio as "16:9" | "1:1" | "9:16" | "4:3" | "3:4" | "3:2" | "2:3",
       }),
-      resolution:
-        options?.resolution === "720p"
-          ? "1280x720"
-          : "854x480",
+      resolution: resolutionDimensions,
       providerOptions: {
         xai: {
           pollTimeoutMs: 600_000, // 10 min

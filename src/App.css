@@ -105,6 +105,27 @@
   padding-top: 0;
 }
 
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.result-grid-item {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.result-grid-item .result-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .preview-at-bottom {
   margin-top: 1.5rem;
   padding-top: 1rem;
@@ -424,4 +445,219 @@
 
 .footer-github a:hover {
   color: rgba(255, 255, 255, 0.8);
+}
+
+/* History page styles */
+.history-page {
+  max-width: 100%;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.btn-clear-history {
+  background: rgba(229, 115, 115, 0.1);
+  color: #e57373;
+  border: 1px solid rgba(229, 115, 115, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-clear-history:hover {
+  background: rgba(229, 115, 115, 0.2);
+  border-color: rgba(229, 115, 115, 0.5);
+}
+
+.empty-state {
+  text-align: center;
+  color: #888;
+  padding: 3rem 1rem;
+  font-size: 1.1rem;
+}
+
+.history-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .history-layout {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.history-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.history-card.selected {
+  border-color: #646cff;
+  background: rgba(100, 108, 255, 0.1);
+}
+
+.history-card-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.history-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-card-type {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 1.2rem;
+}
+
+.history-card-info {
+  padding: 0.75rem;
+}
+
+.history-card-prompt {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.history-card-date {
+  font-size: 0.75rem;
+  color: #888;
+  margin: 0;
+}
+
+.history-detail {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.history-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.history-detail-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.history-detail-media {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.history-detail-info {
+  margin-bottom: 1.5rem;
+}
+
+.history-detail-info p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.history-detail-info strong {
+  color: #888;
+  font-weight: 500;
+}
+
+.history-detail-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.history-detail-actions button {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.history-detail-actions button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-delete {
+  background: rgba(229, 115, 115, 0.1) !important;
+  color: #e57373 !important;
+  border-color: rgba(229, 115, 115, 0.3) !important;
+}
+
+.btn-delete:hover {
+  background: rgba(229, 115, 115, 0.2) !important;
+  border-color: rgba(229, 115, 115, 0.5) !important;
 }

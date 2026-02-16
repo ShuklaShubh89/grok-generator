@@ -10,6 +10,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Image to Image",
   "/login": "Log in",
   "/image-to-video": "Image to Video",
+  "/history": "History",
 };
 
 function usePageTitle() {
@@ -24,6 +25,7 @@ import { getApiKeyFromCookie, clearApiKeyCookie } from "./lib/cookies";
 import Login from "./pages/Login";
 import ImageToImage from "./pages/ImageToImage";
 import ImageToVideo from "./pages/ImageToVideo";
+import History from "./pages/History";
 import NotFound from "./pages/NotFound";
 import "./App.css";
 
@@ -53,6 +55,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
       <nav className="nav">
         <Link to="/">Image to Image</Link>
         <Link to="/image-to-video">Image to Video</Link>
+        <Link to="/history">History</Link>
         <button type="button" className="nav-logout" onClick={handleLogout}>
           Log out
         </button>
@@ -82,6 +85,14 @@ function App() {
             element={
               <ProtectedLayout>
                 <ImageToVideo />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedLayout>
+                <History />
               </ProtectedLayout>
             }
           />

@@ -1,15 +1,17 @@
 import { useState, useCallback } from "react";
 import { imageToVideo } from "../lib/grokApi";
 import ImageUpload from "../components/ImageUpload";
+import { addToHistory, createThumbnail } from "../lib/history";
 
 const DURATION_MIN = 1;
 const DURATION_MAX = 15;
-const DURATION_DEFAULT = 5;
+const DURATION_DEFAULT = 3;
 
 export default function ImageToVideo() {
   const [preview, setPreview] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(DURATION_DEFAULT);
+  const [resolution, setResolution] = useState<"360p" | "480p" | "720p">("480p");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,15 +39,33 @@ export default function ImageToVideo() {
     try {
       const url = await imageToVideo(prompt.trim(), preview, {
         duration,
-        resolution: "480p",
+        resolution,
       });
       setResultUrl(url);
+
+      // Save to history
+      try {
+        const thumbnail = await createThumbnail(preview, 150);
+        addToHistory({
+          type: "video",
+          prompt: prompt.trim(),
+          inputImage: thumbnail,
+          resultUrl: url,
+          metadata: {
+            duration,
+            resolution,
+          },
+        });
+      } catch (historyErr) {
+        console.error("Failed to save to history:", historyErr);
+        // Don't fail the whole operation if history save fails
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
     }
-  }, [preview, prompt, duration]);
+  }, [preview, prompt, duration, resolution]);
 
   return (
     <div className="page">
@@ -83,6 +103,18 @@ export default function ImageToVideo() {
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
           />
+        </label>
+
+        <label className="block">
+          <span>Resolution (lower = cheaper)</span>
+          <select
+            value={resolution}
+            onChange={(e) => setResolution(e.target.value as "360p" | "480p" | "720p")}
+          >
+            <option value="360p">360p (640x360) - Lowest cost</option>
+            <option value="480p">480p (854x480) - Recommended</option>
+            <option value="720p">720p (1280x720) - Higher cost</option>
+          </select>
         </label>
 
         <ImageUpload preview={preview} onFileSelect={onFileSelect} />
