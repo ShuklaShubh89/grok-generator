@@ -11,6 +11,8 @@ export interface HistoryItem {
   metadata?: {
     duration?: number;
     resolution?: string;
+    model?: string;
+    imageCount?: number;
   };
 }
 
@@ -72,6 +74,20 @@ export function deleteHistoryItem(id: string): void {
 }
 
 /**
+ * Delete multiple history items by IDs
+ */
+export function deleteHistoryItems(ids: string[]): void {
+  try {
+    const history = getHistory();
+    const idsSet = new Set(ids);
+    const updated = history.filter((item) => !idsSet.has(item.id));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error("Failed to delete history items:", err);
+  }
+}
+
+/**
  * Clear all history
  */
 export function clearHistory(): void {
@@ -91,7 +107,7 @@ export function createThumbnail(dataUrl: string, maxSize = 200): Promise<string>
     img.onload = () => {
       const canvas = document.createElement("canvas");
       let { width, height } = img;
-      
+
       // Scale down to thumbnail size
       if (width > height) {
         if (width > maxSize) {
@@ -104,7 +120,7 @@ export function createThumbnail(dataUrl: string, maxSize = 200): Promise<string>
           height = maxSize;
         }
       }
-      
+
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
@@ -112,15 +128,70 @@ export function createThumbnail(dataUrl: string, maxSize = 200): Promise<string>
         reject(new Error("Failed to get canvas context"));
         return;
       }
-      
+
       ctx.drawImage(img, 0, 0, width, height);
-      
+
       // Convert to JPEG with low quality for thumbnail
       const thumbnail = canvas.toDataURL("image/jpeg", 0.6);
       resolve(thumbnail);
     };
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = dataUrl;
+  });
+}
+
+/**
+ * Create a thumbnail from a video data URL by capturing the first frame
+ */
+export function createVideoThumbnail(videoDataUrl: string, maxSize = 200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadeddata = () => {
+      // Seek to 0.1 seconds to avoid black frame
+      video.currentTime = 0.1;
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        let { videoWidth: width, videoHeight: height } = video;
+
+        // Scale down to thumbnail size
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Failed to get canvas context"));
+          return;
+        }
+
+        ctx.drawImage(video, 0, 0, width, height);
+
+        // Convert to JPEG with low quality for thumbnail
+        const thumbnail = canvas.toDataURL("image/jpeg", 0.6);
+        resolve(thumbnail);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    video.onerror = () => reject(new Error("Failed to load video"));
+    video.src = videoDataUrl;
   });
 }
 

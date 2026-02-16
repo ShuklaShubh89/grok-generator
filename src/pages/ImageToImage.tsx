@@ -1,66 +1,32 @@
 import { useState, useCallback } from "react";
-import { imageEdit } from "../lib/grokApi";
 import ImageUpload from "../components/ImageUpload";
-import { addToHistory, createThumbnail } from "../lib/history";
+import CostEstimator from "../components/CostEstimator";
+import AutoSaveSettings from "../components/AutoSaveSettings";
+import { useAppState } from "../context/AppStateContext";
 
 export default function ImageToImage() {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<"grok-imagine-image" | "grok-imagine-image-pro">("grok-imagine-image");
-  const [imageCount, setImageCount] = useState(1);
-  const [resultUrls, setResultUrls] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { state, updateImageToImageState, generateImages } = useAppState();
+  const { preview, prompt, model, imageCount, resultUrls, loading, error } = state.imageToImage;
+
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const onFileSelect = useCallback((f: File) => {
     if (!f.type.startsWith("image/")) {
-      setError("Please select an image file.");
+      setLocalError("Please select an image file.");
       return;
     }
-    setError(null);
-    setResultUrls([]);
+    setLocalError(null);
+    updateImageToImageState({ resultUrls: [], error: null });
     const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result as string);
+    reader.onload = () => updateImageToImageState({ preview: reader.result as string });
     reader.readAsDataURL(f);
-  }, []);
+  }, [updateImageToImageState]);
 
   const submit = useCallback(async () => {
-    if (!preview || !prompt.trim()) {
-      setError("Please upload an image and enter a prompt.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setResultUrls([]);
-    try {
-      const urls = await imageEdit(prompt.trim(), preview, { model, count: imageCount });
-      setResultUrls(urls);
+    await generateImages();
+  }, [generateImages]);
 
-      // Save to history (save each generated image)
-      try {
-        const thumbnail = await createThumbnail(preview, 150);
-        for (const url of urls) {
-          addToHistory({
-            type: "image",
-            prompt: prompt.trim(),
-            inputImage: thumbnail,
-            resultUrl: url,
-            metadata: {
-              model,
-              imageCount: urls.length,
-            },
-          });
-        }
-      } catch (historyErr) {
-        console.error("Failed to save to history:", historyErr);
-        // Don't fail the whole operation if history save fails
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setLoading(false);
-    }
-  }, [preview, prompt, model, imageCount]);
+  const displayError = error || localError;
 
   return (
     <div className="page">
@@ -80,12 +46,14 @@ export default function ImageToImage() {
         </div>
       )}
 
+      <AutoSaveSettings />
+
       <div className="form">
         <label className="block">
           <span>Prompt</span>
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => updateImageToImageState({ prompt: e.target.value })}
             placeholder="e.g. Change the sky to sunset and add birds"
             rows={3}
           />
@@ -93,7 +61,7 @@ export default function ImageToImage() {
 
         <label className="block">
           <span>Model (Pro = higher quality, 3.5x cost)</span>
-          <select value={model} onChange={(e) => setModel(e.target.value as typeof model)}>
+          <select value={model} onChange={(e) => updateImageToImageState({ model: e.target.value as typeof model })}>
             <option value="grok-imagine-image">Standard ($0.02/image) - Recommended</option>
             <option value="grok-imagine-image-pro">Pro ($0.07/image) - Premium quality</option>
           </select>
@@ -101,7 +69,7 @@ export default function ImageToImage() {
 
         <label className="block">
           <span>Number of images to generate</span>
-          <select value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))}>
+          <select value={imageCount} onChange={(e) => updateImageToImageState({ imageCount: Number(e.target.value) })}>
             <option value={1}>1 image</option>
             <option value={2}>2 images</option>
             <option value={3}>3 images</option>
@@ -111,12 +79,14 @@ export default function ImageToImage() {
 
         <ImageUpload preview={preview} onFileSelect={onFileSelect} />
 
+        <CostEstimator type="image" model={model} imageCount={imageCount} />
+
         <button type="button" onClick={submit} disabled={loading || !preview || !prompt.trim()}>
           {loading ? "Generating…" : `Generate ${imageCount} image${imageCount > 1 ? "s" : ""}`}
         </button>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {displayError && <p className="error">{displayError}</p>}
     </div>
   );
 }

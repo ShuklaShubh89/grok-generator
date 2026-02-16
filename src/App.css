@@ -30,6 +30,58 @@
   color: #e57373;
 }
 
+.cost-estimator {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(100, 108, 255, 0.08);
+  border: 1px solid rgba(100, 108, 255, 0.25);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.cost-estimator:hover {
+  background: rgba(100, 108, 255, 0.12);
+  border-color: rgba(100, 108, 255, 0.35);
+}
+
+.cost-estimator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.cost-estimator-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #888;
+}
+
+.cost-estimator-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #646cff;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-estimator-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.cost-detail {
+  display: block;
+}
+
+.cost-detail-note {
+  display: block;
+  color: #646cff;
+  font-style: italic;
+}
+
 .api-key-input {
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -456,7 +508,34 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-select-mode {
+  background: rgba(100, 108, 255, 0.1);
+  color: #646cff;
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-select-mode:hover {
+  background: rgba(100, 108, 255, 0.2);
+  border-color: rgba(100, 108, 255, 0.5);
+}
+
+.btn-select-mode.active {
+  background: rgba(100, 108, 255, 0.2);
+  border-color: #646cff;
 }
 
 .btn-clear-history {
@@ -473,6 +552,63 @@
 .btn-clear-history:hover {
   background: rgba(229, 115, 115, 0.2);
   border-color: rgba(229, 115, 115, 0.5);
+}
+
+.selection-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background: rgba(100, 108, 255, 0.08);
+  border: 1px solid rgba(100, 108, 255, 0.25);
+  border-radius: 10px;
+}
+
+.selection-info {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #646cff;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-select-all,
+.btn-deselect-all {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-select-all:hover,
+.btn-deselect-all:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-delete-selected {
+  background: rgba(229, 115, 115, 0.15);
+  color: #e57373;
+  border: 1px solid rgba(229, 115, 115, 0.4);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-delete-selected:hover {
+  background: rgba(229, 115, 115, 0.25);
+  border-color: rgba(229, 115, 115, 0.6);
 }
 
 .empty-state {
@@ -518,6 +654,32 @@
 .history-card.selected {
   border-color: #646cff;
   background: rgba(100, 108, 255, 0.1);
+}
+
+.history-card.checked {
+  border-color: #646cff;
+  background: rgba(100, 108, 255, 0.15);
+  transform: scale(0.98);
+}
+
+.history-card-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-card-checkbox input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: pointer;
+  accent-color: #646cff;
 }
 
 .history-card-preview {
@@ -614,6 +776,21 @@
   margin-bottom: 1rem;
 }
 
+.video-note {
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.75rem;
+  background: rgba(100, 108, 255, 0.08);
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #999;
+  line-height: 1.4;
+}
+
+.video-note em {
+  font-style: normal;
+}
+
 .history-detail-info {
   margin-bottom: 1.5rem;
 }
@@ -660,4 +837,89 @@
 .btn-delete:hover {
   background: rgba(229, 115, 115, 0.2) !important;
   border-color: rgba(229, 115, 115, 0.5) !important;
+}
+
+/* ========== Auto-Save Settings ========== */
+.auto-save-settings {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.auto-save-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.auto-save-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.auto-save-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-save-toggle input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.auto-save-toggle span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.auto-save-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auto-save-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.auto-save-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}
+
+.auto-save-unsupported {
+  text-align: center;
+}
+
+.auto-save-unsupported p {
+  margin: 0.5rem 0;
+}
+
+.btn-change-folder {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-change-folder:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.6);
 }

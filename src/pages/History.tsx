@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { getHistory, deleteHistoryItem, clearHistory, type HistoryItem } from "../lib/history";
+import { getHistory, deleteHistoryItem, deleteHistoryItems, clearHistory, type HistoryItem } from "../lib/history";
 
 export default function History() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -28,15 +30,55 @@ export default function History() {
       clearHistory();
       loadHistory();
       setSelectedItem(null);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
     }
+  };
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedIds(new Set());
+    setSelectedItem(null);
+  };
+
+  const toggleItemSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+
+    const count = selectedIds.size;
+    if (confirm(`Delete ${count} selected item${count > 1 ? "s" : ""}?`)) {
+      deleteHistoryItems(Array.from(selectedIds));
+      loadHistory();
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    }
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(history.map(item => item.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
   };
 
   const handleDownload = (item: HistoryItem) => {
     const link = document.createElement("a");
     link.href = item.resultUrl;
-    const extension = item.type === "video" ? "mp4" : "jpg";
+    // Videos are stored as thumbnails, so download as jpg
+    const extension = "jpg";
     const timestamp = new Date(item.timestamp).toISOString().slice(0, 10);
-    link.download = `grok-${item.type}-${timestamp}.${extension}`;
+    const typeLabel = item.type === "video" ? "video-thumbnail" : "image";
+    link.download = `grok-${typeLabel}-${timestamp}.${extension}`;
     link.click();
   };
 
@@ -60,11 +102,49 @@ export default function History() {
       <div className="history-header">
         <h1>Generation History</h1>
         {history.length > 0 && (
-          <button type="button" onClick={handleClearAll} className="btn-clear-history">
-            Clear All
-          </button>
+          <div className="history-header-actions">
+            <button
+              type="button"
+              onClick={toggleSelectionMode}
+              className={`btn-select-mode ${selectionMode ? "active" : ""}`}
+            >
+              {selectionMode ? "Cancel" : "Select"}
+            </button>
+            {!selectionMode && (
+              <button type="button" onClick={handleClearAll} className="btn-clear-history">
+                Clear All
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {selectionMode && history.length > 0 && (
+        <div className="selection-toolbar">
+          <div className="selection-info">
+            {selectedIds.size > 0 ? (
+              <span>{selectedIds.size} item{selectedIds.size > 1 ? "s" : ""} selected</span>
+            ) : (
+              <span>Select items to delete</span>
+            )}
+          </div>
+          <div className="selection-actions">
+            <button type="button" onClick={selectAll} className="btn-select-all">
+              Select All
+            </button>
+            {selectedIds.size > 0 && (
+              <>
+                <button type="button" onClick={deselectAll} className="btn-deselect-all">
+                  Deselect All
+                </button>
+                <button type="button" onClick={handleDeleteSelected} className="btn-delete-selected">
+                  Delete Selected ({selectedIds.size})
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {history.length === 0 ? (
         <p className="empty-state">No generations yet. Create some images or videos to see them here!</p>
@@ -74,15 +154,28 @@ export default function History() {
             {history.map((item) => (
               <div
                 key={item.id}
-                className={`history-card ${selectedItem?.id === item.id ? "selected" : ""}`}
-                onClick={() => setSelectedItem(item)}
+                className={`history-card ${selectedItem?.id === item.id && !selectionMode ? "selected" : ""} ${selectedIds.has(item.id) ? "checked" : ""}`}
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleItemSelection(item.id);
+                  } else {
+                    setSelectedItem(item);
+                  }
+                }}
               >
+                {selectionMode && (
+                  <div className="history-card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleItemSelection(item.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
                 <div className="history-card-preview">
-                  {item.type === "video" ? (
-                    <video src={item.resultUrl} className="history-thumbnail" />
-                  ) : (
-                    <img src={item.resultUrl} alt="Generated" className="history-thumbnail" />
-                  )}
+                  {/* Always show as image since we store thumbnails for videos */}
+                  <img src={item.resultUrl} alt="Generated" className="history-thumbnail" />
                   <div className="history-card-type">
                     {item.type === "video" ? "🎥" : "🖼️"}
                   </div>
@@ -110,10 +203,12 @@ export default function History() {
               </div>
 
               <div className="history-detail-content">
-                {selectedItem.type === "video" ? (
-                  <video src={selectedItem.resultUrl} controls className="history-detail-media" />
-                ) : (
-                  <img src={selectedItem.resultUrl} alt="Generated" className="history-detail-media" />
+                {/* Show thumbnail for videos since we don't store full videos */}
+                <img src={selectedItem.resultUrl} alt="Generated" className="history-detail-media" />
+                {selectedItem.type === "video" && (
+                  <p className="video-note">
+                    <em>Note: This is a thumbnail of the generated video. Full videos are not stored in history to save space.</em>
+                  </p>
                 )}
 
                 <div className="history-detail-info">
@@ -125,6 +220,12 @@ export default function History() {
                   )}
                   {selectedItem.metadata?.resolution && (
                     <p><strong>Resolution:</strong> {selectedItem.metadata.resolution}</p>
+                  )}
+                  {selectedItem.metadata?.model && (
+                    <p><strong>Model:</strong> {selectedItem.metadata.model}</p>
+                  )}
+                  {selectedItem.metadata?.imageCount && selectedItem.metadata.imageCount > 1 && (
+                    <p><strong>Count:</strong> {selectedItem.metadata.imageCount} images</p>
                   )}
                 </div>
 
