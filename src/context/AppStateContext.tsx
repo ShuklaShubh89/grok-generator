@@ -86,27 +86,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  const generateImages = async (onWarning?: (assessment: RiskAssessment) => Promise<boolean>) => {
+  const generateImages = async () => {
     const { preview, prompt, model, imageCount } = state.imageToImage;
 
     if (!preview || !prompt.trim()) {
       updateImageToImageState({ error: "Please upload an image and enter a prompt." });
       return;
-    }
-
-    // Calculate cost for risk assessment
-    const totalCost = calculateImageCost(model, imageCount);
-
-    // Assess moderation risk with Grok AI
-    const assessment = await assessModerationRiskWithGrok(prompt.trim(), 'image', totalCost);
-
-    // Show warning if risk is medium or high and callback provided
-    // Updated thresholds: Medium >= 25%, High >= 50%
-    if (onWarning && assessment.riskScore >= 0.25 && assessment.confidence >= 0.3) {
-      const shouldProceed = await onWarning(assessment);
-      if (!shouldProceed) {
-        return; // User cancelled
-      }
     }
 
     updateImageToImageState({ loading: true, error: null, resultUrls: [] });
@@ -150,25 +135,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const generateVideo = async (onWarning?: (assessment: RiskAssessment) => Promise<boolean>) => {
+  const generateVideo = async () => {
     const { preview, prompt, duration, resolution } = state.imageToVideo;
 
     if (!preview || !prompt.trim()) {
       updateImageToVideoState({ error: "Please upload an image and enter a prompt." });
       return;
-    }
-
-    // Video generation is expensive - always assess risk with Grok AI
-    const videoCost = calculateVideoCost(duration, resolution);
-    const assessment = await assessModerationRiskWithGrok(prompt.trim(), 'video', videoCost);
-
-    // Show warning if risk is medium or high and callback provided
-    // Updated thresholds: Medium >= 25%, High >= 50%
-    if (onWarning && assessment.riskScore >= 0.25 && assessment.confidence >= 0.3) {
-      const shouldProceed = await onWarning(assessment);
-      if (!shouldProceed) {
-        return; // User cancelled
-      }
     }
 
     updateImageToVideoState({ loading: true, error: null, resultUrl: null });

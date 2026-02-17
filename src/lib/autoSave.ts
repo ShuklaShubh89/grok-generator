@@ -5,11 +5,90 @@
 
 // Check if File System Access API is supported
 export function isAutoSaveSupported(): boolean {
-  return 'showDirectoryPicker' in window;
+  return 'showDirectoryPicker' in window && 'indexedDB' in window;
 }
 
 // Store the directory handle in memory
 let directoryHandle: FileSystemDirectoryHandle | null = null;
+
+// IndexedDB database name and store
+const DB_NAME = 'grok-autosave-db';
+const DB_VERSION = 1;
+const STORE_NAME = 'directory-handles';
+const HANDLE_KEY = 'autosave-directory';
+
+/**
+ * Open IndexedDB database
+ */
+function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+}
+
+/**
+ * Save directory handle to IndexedDB
+ */
+async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(handle, HANDLE_KEY);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+}
+
+/**
+ * Load directory handle from IndexedDB
+ */
+async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(HANDLE_KEY);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result || null);
+    });
+  } catch (err) {
+    console.error('Failed to load directory handle from IndexedDB:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete directory handle from IndexedDB
+ */
+async function deleteDirectoryHandle(): Promise<void> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.delete(HANDLE_KEY);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  } catch (err) {
+    console.error('Failed to delete directory handle from IndexedDB:', err);
+  }
+}
 
 /**
  * Prompt user to select a destination folder for auto-saving
@@ -21,14 +100,20 @@ export async function selectAutoSaveFolder(): Promise<boolean> {
 
   try {
     // Request directory access
-    directoryHandle = await window.showDirectoryPicker({
+    const handle = await window.showDirectoryPicker({
       mode: 'readwrite',
       startIn: 'downloads',
     });
-    
-    // Store in localStorage for persistence across sessions
+
+    // Store in memory
+    directoryHandle = handle;
+
+    // Persist to IndexedDB for future sessions
+    await saveDirectoryHandle(handle);
+
+    // Store flag in localStorage
     localStorage.setItem('autoSaveEnabled', 'true');
-    
+
     return true;
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -50,9 +135,61 @@ export function isAutoSaveEnabled(): boolean {
 /**
  * Disable auto-save
  */
-export function disableAutoSave(): void {
+export async function disableAutoSave(): Promise<void> {
   directoryHandle = null;
   localStorage.removeItem('autoSaveEnabled');
+  await deleteDirectoryHandle();
+}
+
+/**
+ * Initialize auto-save on app startup
+ * Attempts to restore the directory handle from IndexedDB
+ */
+export async function initializeAutoSave(): Promise<void> {
+  if (!isAutoSaveSupported()) {
+    return;
+  }
+
+  // Check if auto-save was enabled
+  if (localStorage.getItem('autoSaveEnabled') !== 'true') {
+    return;
+  }
+
+  try {
+    // Try to load the saved directory handle
+    const handle = await loadDirectoryHandle();
+    if (!handle) {
+      console.warn('No saved directory handle found');
+      localStorage.removeItem('autoSaveEnabled');
+      return;
+    }
+
+    // Verify we still have permission to access the directory
+    const permission = await handle.queryPermission({ mode: 'readwrite' });
+
+    if (permission === 'granted') {
+      // Permission already granted, restore the handle
+      directoryHandle = handle;
+      console.log('Auto-save directory restored:', handle.name);
+    } else if (permission === 'prompt') {
+      // Need to request permission again
+      const newPermission = await handle.requestPermission({ mode: 'readwrite' });
+      if (newPermission === 'granted') {
+        directoryHandle = handle;
+        console.log('Auto-save directory restored with new permission:', handle.name);
+      } else {
+        console.warn('Permission denied for saved directory');
+        await disableAutoSave();
+      }
+    } else {
+      // Permission denied
+      console.warn('Permission denied for saved directory');
+      await disableAutoSave();
+    }
+  } catch (err) {
+    console.error('Failed to restore auto-save directory:', err);
+    await disableAutoSave();
+  }
 }
 
 /**
@@ -60,19 +197,7 @@ export function disableAutoSave(): void {
  * Returns null if not available (doesn't prompt user)
  */
 async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
-  if (directoryHandle) {
-    return directoryHandle;
-  }
-
-  // If auto-save was enabled before but handle is lost (page refresh),
-  // silently disable it - user must manually re-enable
-  // This prevents the "user gesture" error when trying to show picker after async operations
-  if (localStorage.getItem('autoSaveEnabled') === 'true') {
-    console.warn('Auto-save folder handle lost (page refresh). Please re-enable auto-save in settings.');
-    disableAutoSave();
-  }
-
-  return null;
+  return directoryHandle;
 }
 
 /**

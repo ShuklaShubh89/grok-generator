@@ -3,7 +3,6 @@ import ImageUpload from "../components/ImageUpload";
 import CostEstimator from "../components/CostEstimator";
 import AutoSaveSettings from "../components/AutoSaveSettings";
 import ModerationStats from "../components/ModerationStats";
-import ModerationWarning from "../components/ModerationWarning";
 import ModerationConfidence from "../components/ModerationConfidence";
 import { useAppState } from "../context/AppStateContext";
 import type { RiskAssessment } from "../lib/promptAnalysis";
@@ -18,7 +17,6 @@ export default function ImageToVideo() {
   const { preview, prompt, duration, resolution, resultUrl, loading, error } = state.imageToVideo;
 
   const [localError, setLocalError] = useState<string | null>(null);
-  const [warningAssessment, setWarningAssessment] = useState<RiskAssessment | null>(null);
   const [confidenceAssessment, setConfidenceAssessment] = useState<RiskAssessment | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [preflightRunning, setPreflightRunning] = useState(false);
@@ -37,44 +35,16 @@ export default function ImageToVideo() {
   }, [updateImageToVideoState]);
 
   const submit = useCallback(async () => {
-    setAnalyzing(true);
-    setConfidenceAssessment(null);
-
-    await generateVideo(async (assessment) => {
-      setAnalyzing(false);
-      setConfidenceAssessment(assessment);
-
-      // Show warning modal and wait for user decision
-      setWarningAssessment(assessment);
-      return new Promise((resolve) => {
-        // Store resolve function to be called by modal buttons
-        (window as any).__moderationWarningResolve = resolve;
-      });
-    });
-
-    setAnalyzing(false);
+    await generateVideo();
   }, [generateVideo]);
 
-  const handleWarningCancel = useCallback(() => {
-    setWarningAssessment(null);
-    if ((window as any).__moderationWarningResolve) {
-      (window as any).__moderationWarningResolve(false);
-      delete (window as any).__moderationWarningResolve;
+  // Manual preflight check (not from warning modal)
+  const handleManualPreflight = useCallback(async () => {
+    if (!preview || !prompt.trim()) {
+      setLocalError("Please upload an image and enter a prompt first.");
+      return;
     }
-  }, []);
 
-  const handleWarningProceed = useCallback(() => {
-    setWarningAssessment(null);
-    if ((window as any).__moderationWarningResolve) {
-      (window as any).__moderationWarningResolve(true);
-      delete (window as any).__moderationWarningResolve;
-    }
-  }, []);
-
-  const handlePreflight = useCallback(async () => {
-    if (!preview || !prompt.trim()) return;
-
-    setWarningAssessment(null); // Close warning modal
     setPreflightRunning(true);
     setPreflightResult(null);
     setLocalError(null);
@@ -83,37 +53,16 @@ export default function ImageToVideo() {
       const result = await runPreflightCheck(prompt.trim(), preview);
       setPreflightResult(result);
 
-      if (result.passed) {
-        // Preflight passed! Ask if user wants to proceed with full generation
-        const shouldProceed = confirm(
-          "✅ Preflight check passed! Your prompt is safe.\n\n" +
-          "Would you like to proceed with the full video generation?"
-        );
-
-        if (shouldProceed && (window as any).__moderationWarningResolve) {
-          (window as any).__moderationWarningResolve(true);
-          delete (window as any).__moderationWarningResolve;
-        } else if ((window as any).__moderationWarningResolve) {
-          (window as any).__moderationWarningResolve(false);
-          delete (window as any).__moderationWarningResolve;
-        }
-      } else {
+      if (!result.passed) {
         // Preflight failed - moderation caught
         setLocalError(
           `❌ Preflight check failed: ${result.error}\n\n` +
           "Your prompt was moderated. Please modify it and try again."
         );
-        if ((window as any).__moderationWarningResolve) {
-          (window as any).__moderationWarningResolve(false);
-          delete (window as any).__moderationWarningResolve;
-        }
       }
+      // If passed, the success message will show automatically via preflightResult state
     } catch (err) {
       setLocalError(`Preflight check error: ${err instanceof Error ? err.message : String(err)}`);
-      if ((window as any).__moderationWarningResolve) {
-        (window as any).__moderationWarningResolve(false);
-        delete (window as any).__moderationWarningResolve;
-      }
     } finally {
       setPreflightRunning(false);
     }
@@ -219,6 +168,15 @@ export default function ImageToVideo() {
           </button>
           <button
             type="button"
+            onClick={handleManualPreflight}
+            disabled={preflightRunning || !preview || !prompt.trim()}
+            className="btn-preflight"
+            title="Test your prompt with a quick 1s 480p video ($0.052) to catch moderation early"
+          >
+            {preflightRunning ? "Running preflight…" : "🧪 Preflight Check"}
+          </button>
+          <button
+            type="button"
             onClick={submit}
             disabled={loading || !preview || !prompt.trim()}
             className="btn-generate"
@@ -226,19 +184,13 @@ export default function ImageToVideo() {
             {loading ? "Generating video…" : "Generate video"}
           </button>
         </div>
+
+        <div className="button-help-text">
+          <p>💡 <strong>Preflight Check:</strong> Test your prompt with a 1s video ($0.052) before committing to the full generation. Saves money if your prompt gets moderated!</p>
+        </div>
       </div>
 
       {displayError && <p className="error">{displayError}</p>}
-
-      {warningAssessment && (
-        <ModerationWarning
-          assessment={warningAssessment}
-          type="video"
-          onCancel={handleWarningCancel}
-          onProceed={handleWarningProceed}
-          onPreflight={handlePreflight}
-        />
-      )}
     </div>
   );
 }

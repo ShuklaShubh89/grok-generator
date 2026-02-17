@@ -4,27 +4,27 @@ import {
   isAutoSaveEnabled,
   selectAutoSaveFolder,
   disableAutoSave,
+  initializeAutoSave,
 } from "../lib/autoSave";
 
 export default function AutoSaveSettings() {
   const [enabled, setEnabled] = useState(false);
   const [supported, setSupported] = useState(true);
-  const [showRefreshWarning, setShowRefreshWarning] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     setSupported(isAutoSaveSupported());
-    const currentlyEnabled = isAutoSaveEnabled();
-    setEnabled(currentlyEnabled);
 
-    // Check if auto-save was previously enabled but handle is lost
-    const wasEnabled = localStorage.getItem('autoSaveEnabled') === 'true';
-    if (wasEnabled && !currentlyEnabled) {
-      setShowRefreshWarning(true);
-      // Clear the warning after showing it once
-      setTimeout(() => setShowRefreshWarning(false), 10000);
-    }
+    // Initialize auto-save on component mount
+    const init = async () => {
+      await initializeAutoSave();
+      setEnabled(isAutoSaveEnabled());
+      setInitializing(false);
+    };
 
-    // Refresh enabled state periodically in case it was disabled due to lost handle
+    init();
+
+    // Refresh enabled state periodically
     const interval = setInterval(() => {
       setEnabled(isAutoSaveEnabled());
     }, 1000);
@@ -35,7 +35,7 @@ export default function AutoSaveSettings() {
   const handleToggle = async () => {
     if (enabled) {
       // Disable auto-save
-      disableAutoSave();
+      await disableAutoSave();
       setEnabled(false);
     } else {
       // Enable auto-save - prompt for folder
@@ -83,16 +83,11 @@ export default function AutoSaveSettings() {
             type="checkbox"
             checked={enabled}
             onChange={handleToggle}
+            disabled={initializing}
           />
-          <span>{enabled ? "Enabled" : "Disabled"}</span>
+          <span>{initializing ? "Loading..." : enabled ? "Enabled" : "Disabled"}</span>
         </label>
       </div>
-
-      {showRefreshWarning && (
-        <div className="auto-save-warning">
-          <p>⚠️ Auto-save was disabled due to page refresh. Please re-enable it to continue auto-saving.</p>
-        </div>
-      )}
 
       {enabled ? (
         <div className="auto-save-info">

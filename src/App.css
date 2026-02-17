@@ -220,6 +220,25 @@
   width: 100%;
 }
 
+.button-help-text {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 6px;
+}
+
+.button-help-text p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(196, 181, 253, 0.9);
+  line-height: 1.5;
+}
+
+.button-help-text strong {
+  color: rgba(196, 181, 253, 1);
+}
+
 .btn-analyze {
   flex: 0 0 auto;
   padding: 0.75rem 1.25rem;
@@ -240,6 +259,30 @@
 }
 
 .btn-analyze:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-preflight {
+  flex: 0 0 auto;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-preflight:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-preflight:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
