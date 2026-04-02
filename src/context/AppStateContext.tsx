@@ -1,9 +1,11 @@
 import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { imageEdit, imageToVideo, videoEdit } from "../lib/grokApi";
+import { imageEdit, imageToVideo, videoEdit, videoExtend, getLastXaiApiErrorTrace } from "../lib/grokApi";
 import { addToHistory, createThumbnail, createVideoThumbnail } from "../lib/history";
 import { autoSaveFile, generateAutoSaveFilename, isAutoSaveEnabled } from "../lib/autoSave";
 import { assessModerationRiskWithGrok, type RiskAssessment } from "../lib/promptAnalysis";
+import { buildVideoSourceProxyUrl } from "../lib/videoSourceProxy";
+import { rewritePromptWithGrok, type PromptRewriteResult } from "../lib/grokPromptRewrite";
 
 
 // State for Image-to-Image page
@@ -20,10 +22,11 @@ interface ImageToImageState {
 
 // State for Image-to-Video page
 interface ImageToVideoState {
-  mode: "generate" | "extend";
+  mode: "generate" | "edit" | "extend";
   preview: string | null;
   sourceVideoUrl: string;
   sourceVideoName: string | null;
+  sourceVideoKey: string | null;
   prompt: string;
   duration: number;
   resolution: "480p" | "720p";
@@ -31,6 +34,7 @@ interface ImageToVideoState {
   sourceUrl: string | null;
   loading: boolean;
   error: string | null;
+  diagnostics: string | null;
 }
 
 interface AppState {
@@ -45,6 +49,7 @@ interface AppStateContextType {
   generateImages: (onWarning?: (assessment: RiskAssessment) => Promise<boolean>) => Promise<void>;
   generateVideo: (onWarning?: (assessment: RiskAssessment) => Promise<boolean>) => Promise<void>;
   analyzePrompt: (prompt: string, type: 'image' | 'video', cost: number) => Promise<RiskAssessment>;
+  rewritePrompt: (prompt: string, type: 'image' | 'video') => Promise<PromptRewriteResult>;
 }
 
 const defaultImageToImageState: ImageToImageState = {
@@ -63,6 +68,7 @@ const defaultImageToVideoState: ImageToVideoState = {
   preview: null,
   sourceVideoUrl: "",
   sourceVideoName: null,
+  sourceVideoKey: null,
   prompt: "",
   duration: 3,
   resolution: "480p",
@@ -70,6 +76,7 @@ const defaultImageToVideoState: ImageToVideoState = {
   sourceUrl: null,
   loading: false,
   error: null,
+  diagnostics: null,
 };
 
 const defaultState: AppState = {
@@ -146,7 +153,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   const generateVideo = async () => {
-    const { mode, preview, sourceVideoUrl, sourceVideoName, prompt, duration, resolution } = state.imageToVideo;
+    const { mode, preview, sourceVideoUrl, sourceVideoName, sourceVideoKey, prompt, duration, resolution } = state.imageToVideo;
 
     if (!prompt.trim()) {
       updateImageToVideoState({ error: "Please enter a prompt." });
@@ -158,18 +165,36 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (mode === "extend" && !sourceVideoUrl.trim()) {
+    if ((mode === "edit" || mode === "extend") && !sourceVideoUrl.trim()) {
       updateImageToVideoState({ error: "Please provide a source video URL and enter a prompt." });
       return;
     }
 
-    updateImageToVideoState({ loading: true, error: null, resultUrl: null, sourceUrl: null });
+    let extensionSourceUrl = sourceVideoUrl.trim();
+    if ((mode === "edit" || mode === "extend") && sourceVideoKey) {
+      try {
+        extensionSourceUrl = buildVideoSourceProxyUrl(sourceVideoKey);
+      } catch (err) {
+        updateImageToVideoState({
+          loading: false,
+          error: err instanceof Error ? err.message : "Private video upload proxy is not available.",
+        });
+        return;
+      }
+    }
+
+    updateImageToVideoState({ loading: true, error: null, diagnostics: null, resultUrl: null, sourceUrl: null });
 
     try {
       const result =
         mode === "generate"
           ? await imageToVideo(prompt.trim(), preview!, { duration, resolution })
-          : await videoEdit(prompt.trim(), sourceVideoUrl.trim(), sourceVideoName, {
+          : mode === "edit"
+            ? await videoEdit(prompt.trim(), extensionSourceUrl, sourceVideoName, {
+                pollTimeoutMs: 900_000,
+              })
+            : await videoExtend(prompt.trim(), extensionSourceUrl, sourceVideoName, {
+              duration: Math.min(10, Math.max(2, duration)),
               pollTimeoutMs: 900_000, // 15 min for video extension jobs
             });
       updateImageToVideoState({ resultUrl: result.dataUrl, sourceUrl: result.sourceUrl, loading: false });
@@ -199,6 +224,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               resolution,
               mode,
               sourceVideoName: sourceVideoName ?? undefined,
+              sourceVideoKey: sourceVideoKey ?? undefined,
               ...(mode === "extend" ? { sourceVideoUrl: sourceVideoUrl.trim() } : {}),
             },
           });
@@ -209,6 +235,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       updateImageToVideoState({
         error: err instanceof Error ? err.message : "Request failed",
+        diagnostics: getLastXaiApiErrorTrace()
+          ? JSON.stringify(getLastXaiApiErrorTrace(), null, 2)
+          : null,
         loading: false
       });
     }
@@ -216,6 +245,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const analyzePrompt = async (prompt: string, type: 'image' | 'video', cost: number): Promise<RiskAssessment> => {
     return await assessModerationRiskWithGrok(prompt, type, cost);
+  };
+
+  const rewritePrompt = async (prompt: string, type: 'image' | 'video'): Promise<PromptRewriteResult> => {
+    return await rewritePromptWithGrok(prompt, type);
   };
 
   return (
@@ -227,6 +260,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         generateImages,
         generateVideo,
         analyzePrompt,
+        rewritePrompt,
       }}
     >
       {children}

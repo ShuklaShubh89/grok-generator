@@ -6,7 +6,7 @@ interface CostEstimatorProps {
   model?: "grok-imagine-image" | "grok-imagine-image-pro";
   imageCount?: number;
   // For videos
-  videoMode?: "generate" | "extend";
+  videoMode?: "generate" | "edit" | "extend";
   duration?: number;
   resolution?: "480p" | "720p";
 }
@@ -50,6 +50,10 @@ export default function CostEstimator({
               <span className="cost-detail">
                 Image input: ${PRICING.video.imageInput.toFixed(3)} + {duration}s @ ${PRICING.video.perSecond[resolution].toFixed(2)}/s ({resolution})
               </span>
+            ) : videoMode === "edit" ? (
+              <span className="cost-detail">
+                Source video edit estimate: pricing depends on the input video's retained duration and capped resolution.
+              </span>
             ) : (
               <span className="cost-detail">
                 Source video estimate: ${PRICING.video.imageInput.toFixed(3)} + {duration}s @ ${PRICING.video.perSecond[resolution].toFixed(2)}/s ({resolution})
@@ -58,7 +62,9 @@ export default function CostEstimator({
             <span className="cost-detail-note">
               {videoMode === "generate"
                 ? "xAI bills image-to-video with image input plus per-second output pricing."
-                : "xAI editing keeps the source video's timing and resolution, so this is only an estimate."}
+                : videoMode === "edit"
+                  ? "xAI video edits keep the source video's duration, aspect ratio, and resolution, so this is a rough estimate."
+                  : "xAI video extensions add new seconds to the source video, so this is only an estimate."}
             </span>
             {resolution === "720p" && (
               <span className="cost-detail-note">720p is 40% more expensive than 480p</span>

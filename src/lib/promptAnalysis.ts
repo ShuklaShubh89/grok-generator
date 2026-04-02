@@ -4,7 +4,6 @@
  */
 
 import { getModerationHistory, type ModerationEvent } from "./moderationTracking";
-import { checkTextModeration, type TextModerationResult } from "./grokTextModeration";
 import { PRICING } from "./pricing";
 
 export interface SimilarPrompt {
@@ -20,7 +19,6 @@ export interface RiskAssessment {
   riskyWords: string[];
   suggestions: string[];
   estimatedWaste: number;
-  grokAnalysis?: TextModerationResult; // Grok's AI-based analysis
 }
 
 /**
@@ -201,63 +199,12 @@ export function assessModerationRisk(
 }
 
 /**
- * Assess risk with Grok AI analysis (async version)
- * This combines historical analysis with Grok's AI-based moderation check
+ * Async wrapper kept for UI compatibility.
  */
 export async function assessModerationRiskWithGrok(
   prompt: string,
   type: 'image' | 'video',
   cost: number
 ): Promise<RiskAssessment> {
-  // Get historical analysis first
-  const baseAssessment = assessModerationRisk(prompt, type, cost);
-
-  try {
-    // Get Grok's AI analysis
-    const grokAnalysis = await checkTextModeration(prompt);
-
-    // Combine both analyses
-    let combinedRiskScore = baseAssessment.riskScore;
-    let combinedConfidence = baseAssessment.confidence;
-
-    if (grokAnalysis.confidence > 0) {
-      // Grok says it's unsafe
-      if (!grokAnalysis.safe) {
-        // Weight Grok's analysis heavily (70%) with historical data (30%)
-        combinedRiskScore = (grokAnalysis.confidence * 0.7) + (baseAssessment.riskScore * 0.3);
-        combinedConfidence = Math.max(grokAnalysis.confidence, baseAssessment.confidence);
-      } else {
-        // Grok says it's safe - reduce risk score
-        combinedRiskScore = baseAssessment.riskScore * 0.5; // Reduce by 50%
-        combinedConfidence = Math.max(grokAnalysis.confidence * 0.8, baseAssessment.confidence);
-      }
-    }
-
-    // Combine suggestions
-    const combinedSuggestions = [
-      ...baseAssessment.suggestions,
-      ...grokAnalysis.suggestions
-    ].slice(0, 5); // Limit to 5 suggestions
-
-    // Combine risky words with Grok's issues
-    const combinedRiskyWords = [
-      ...baseAssessment.riskyWords,
-      ...grokAnalysis.issues.map(issue => issue.toLowerCase())
-    ];
-
-    return {
-      ...baseAssessment,
-      riskScore: combinedRiskScore,
-      confidence: combinedConfidence,
-      suggestions: combinedSuggestions,
-      riskyWords: Array.from(new Set(combinedRiskyWords)), // Remove duplicates
-      estimatedWaste: combinedRiskScore * cost,
-      grokAnalysis,
-    };
-  } catch (err) {
-    console.error('Failed to get Grok analysis, using historical data only:', err);
-    // If Grok fails, return the base assessment
-    return baseAssessment;
-  }
+  return assessModerationRisk(prompt, type, cost);
 }
-

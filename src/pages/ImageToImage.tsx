@@ -4,18 +4,22 @@ import CostEstimator from "../components/CostEstimator";
 import AutoSaveSettings from "../components/AutoSaveSettings";
 import ModerationStats from "../components/ModerationStats";
 import ModerationConfidence from "../components/ModerationConfidence";
+import PromptRewriteCard from "../components/PromptRewriteCard";
 import { useAppState } from "../context/AppStateContext";
 import type { RiskAssessment } from "../lib/promptAnalysis";
+import type { PromptRewriteResult } from "../lib/grokPromptRewrite";
 import { calculateImageEditCost } from "../lib/pricing";
 
 export default function ImageToImage() {
-  const { state, updateImageToImageState, generateImages, analyzePrompt } = useAppState();
+  const { state, updateImageToImageState, generateImages, analyzePrompt, rewritePrompt } = useAppState();
   const { preview, prompt, model, imageCount, resultUrls, sourceUrls, loading, error } = state.imageToImage;
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [confidenceAssessment, setConfidenceAssessment] = useState<RiskAssessment | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteResult, setRewriteResult] = useState<PromptRewriteResult | null>(null);
 
   const onFileSelect = useCallback((f: File) => {
     if (!f.type.startsWith("image/")) {
@@ -54,6 +58,26 @@ export default function ImageToImage() {
     }
   }, [prompt, model, imageCount, analyzePrompt]);
 
+  const handleRewritePrompt = useCallback(async () => {
+    if (!prompt.trim()) {
+      setLocalError("Please enter a prompt to rewrite.");
+      return;
+    }
+
+    setRewriting(true);
+    setRewriteResult(null);
+    setLocalError(null);
+
+    try {
+      const result = await rewritePrompt(prompt.trim(), "image");
+      setRewriteResult(result);
+    } catch (err) {
+      setLocalError(`Rewrite failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setRewriting(false);
+    }
+  }, [prompt, rewritePrompt]);
+
   const displayError = error || localError;
 
   return (
@@ -91,6 +115,16 @@ export default function ImageToImage() {
       <ModerationStats filterType="image" />
 
       <ModerationConfidence assessment={confidenceAssessment} analyzing={analyzing} />
+      <PromptRewriteCard
+        result={rewriteResult}
+        loading={rewriting}
+        onApply={() => {
+          if (!rewriteResult) return;
+          updateImageToImageState({ prompt: rewriteResult.rewrittenPrompt });
+          setRewriteResult(null);
+        }}
+        onDismiss={() => setRewriteResult(null)}
+      />
 
       <div className="form">
         <label className="block">
@@ -138,8 +172,16 @@ export default function ImageToImage() {
         <div className="button-group">
           <button
             type="button"
+            onClick={handleRewritePrompt}
+            disabled={rewriting || !prompt.trim()}
+            className="btn-analyze"
+          >
+            {rewriting ? "Rewriting…" : "✍️ Rewrite Prompt"}
+          </button>
+          <button
+            type="button"
             onClick={handleAnalyzePrompt}
-            disabled={analyzing || !prompt.trim()}
+            disabled={analyzing || rewriting || !prompt.trim()}
             className="btn-analyze"
           >
             {analyzing ? "Analyzing…" : "🔍 Analyze Prompt"}

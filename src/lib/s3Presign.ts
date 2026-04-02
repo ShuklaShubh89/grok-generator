@@ -107,7 +107,7 @@ function buildQueryString(
 }
 
 async function presignS3Url(params: {
-  method: "GET" | "PUT";
+  method: "GET" | "PUT" | "HEAD";
   bucket: string;
   region: string;
   accessKeyId: string;
@@ -166,6 +166,40 @@ async function presignS3Url(params: {
     .join("");
 
   return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signatureHex}`;
+}
+
+export async function createS3PresignedUrl({
+  method,
+  bucket,
+  region,
+  accessKeyId,
+  secretAccessKey,
+  sessionToken,
+  key,
+  expiresSeconds = DEFAULT_DOWNLOAD_EXPIRES_SECONDS,
+  contentType,
+}: {
+  method: "GET" | "PUT" | "HEAD";
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  key: string;
+  expiresSeconds?: number;
+  contentType?: string;
+}): Promise<string> {
+  return presignS3Url({
+    method,
+    bucket,
+    region,
+    accessKeyId,
+    secretAccessKey,
+    sessionToken,
+    key,
+    expiresSeconds,
+    contentType,
+  });
 }
 
 export async function createS3PresignedUpload({

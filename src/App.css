@@ -259,6 +259,52 @@
   margin-bottom: 0.75rem;
 }
 
+.prompt-rewrite-card {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: 10px;
+}
+
+.prompt-rewrite-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-rewrite-status {
+  color: #93c5fd;
+  font-size: 0.85rem;
+}
+
+.prompt-rewrite-rationale {
+  margin: 0 0 0.75rem;
+  color: #bfdbfe;
+  font-size: 0.92rem;
+}
+
+.prompt-rewrite-output {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  margin-bottom: 0.75rem;
+}
+
+.prompt-rewrite-changes {
+  margin: 0 0 0.9rem;
+  padding-left: 1.1rem;
+  color: #dbeafe;
+  font-size: 0.9rem;
+}
+
 .login-key-note {
   margin: 0 0 1.5rem;
   padding: 0.6rem 0.9rem;
@@ -565,6 +611,29 @@
 .error {
   color: #e57373;
   margin-top: 1rem;
+}
+
+.diagnostics {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.diagnostics summary {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+.diagnostics pre {
+  margin: 0.75rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .status {

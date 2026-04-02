@@ -5,7 +5,7 @@ A small web app to edit images and generate videos using the [xAI (Grok) API](ht
 ## Features
 
 - **Image to Image** — Upload an image and a text prompt; get a new image edited to match the prompt.
-- **Image to Video** — Upload an image and a prompt, choose duration (1–15 seconds); get a video.
+- **Image to Video** — Generate from an image, edit an existing short MP4, or extend an existing MP4 with additional seconds.
 - **Login** — Your xAI API key is stored in a cookie in your browser (not sent to any server except xAI via the app). No account on this app; just your API key.
 
 ## Prerequisites
@@ -42,10 +42,12 @@ By default, API requests use a same-origin `/v1` path that is proxied to `https:
    - Enter a prompt describing how you want the image edited.
    - Submit. The result image appears at the top; you can download it if needed.
 
-3. **Image to Video**  
+3. **Image to Video**
    - Open **Image to Video** from the nav.
-   - Upload an image and enter a prompt.
-   - Use the duration slider (1–15 seconds).
+   - Choose a mode:
+   - `Generate video from image`: upload an image, add a prompt, and choose a duration from 1 to 15 seconds.
+   - `Edit existing video`: provide a public MP4 URL or upload a local MP4 up to 8.7 seconds, then describe the edits.
+   - `Extend existing video`: provide a public MP4 URL or upload a local MP4 between 2 and 15 seconds, then choose how many seconds to add (2 to 10).
    - Submit. When the video is ready, it appears at the top and can be played or downloaded.
 
 4. **Log out**  

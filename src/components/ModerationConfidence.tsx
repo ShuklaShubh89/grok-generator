@@ -10,8 +10,8 @@ export default function ModerationConfidence({ assessment, analyzing }: Moderati
     return (
       <div className="moderation-confidence analyzing">
         <div className="confidence-header">
-          <span className="confidence-icon">🤖</span>
-          <span className="confidence-text">Analyzing prompt with Grok AI...</span>
+          <span className="confidence-icon">🔎</span>
+          <span className="confidence-text">Reviewing prompt against your local generation history...</span>
         </div>
       </div>
     );
@@ -32,15 +32,6 @@ export default function ModerationConfidence({ assessment, analyzing }: Moderati
   };
 
   const risk = getRiskLevel();
-
-  const getGrokSafety = () => {
-    if (!assessment.grokAnalysis) return null;
-    return assessment.grokAnalysis.safe ? 
-      { label: 'Safe', color: 'success', icon: '✅' } : 
-      { label: 'Unsafe', color: 'danger', icon: '⚠️' };
-  };
-
-  const grokSafety = getGrokSafety();
 
   return (
     <div className={`moderation-confidence risk-${risk.color}`}>
@@ -65,47 +56,6 @@ export default function ModerationConfidence({ assessment, analyzing }: Moderati
             <span className="confidence-label">Potential Waste if Moderated:</span>
             <span className="confidence-value warning-text">{formatCost(assessment.estimatedWaste)}</span>
           </div>
-        )}
-
-        {/* Grok AI Analysis */}
-        {grokSafety && assessment.grokAnalysis && (
-          <>
-            <div className="confidence-row">
-              <span className="confidence-label">Grok AI Assessment:</span>
-              <span className={`confidence-value grok-${grokSafety.color}`}>
-                {grokSafety.icon} {grokSafety.label} ({formatPercent(assessment.grokAnalysis.confidence)})
-              </span>
-            </div>
-
-            {assessment.grokAnalysis.reasoning && (
-              <div className="confidence-reasoning">
-                <span className="reasoning-label">AI Reasoning:</span>
-                <span className="reasoning-text">{assessment.grokAnalysis.reasoning}</span>
-              </div>
-            )}
-
-            {assessment.grokAnalysis.issues.length > 0 && (
-              <div className="confidence-issues">
-                <span className="issues-label">⚠️ Issues Found ({assessment.grokAnalysis.issues.length}):</span>
-                <ul className="issues-list">
-                  {assessment.grokAnalysis.issues.map((issue, i) => (
-                    <li key={i}>{issue}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {assessment.grokAnalysis.suggestions.length > 0 && (
-              <div className="confidence-suggestions">
-                <span className="suggestions-label">💡 Suggestions ({assessment.grokAnalysis.suggestions.length}):</span>
-                <ul className="suggestions-list">
-                  {assessment.grokAnalysis.suggestions.map((suggestion, i) => (
-                    <li key={i}>{suggestion}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
         )}
 
         {/* Historical Data */}
@@ -152,4 +102,3 @@ export default function ModerationConfidence({ assessment, analyzing }: Moderati
     </div>
   );
 }
-

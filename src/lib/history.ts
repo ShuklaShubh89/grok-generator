@@ -13,9 +13,10 @@ export interface HistoryItem {
     resolution?: string;
     model?: string;
     imageCount?: number;
-    mode?: "generate" | "extend";
+    mode?: "generate" | "edit" | "extend";
     sourceVideoUrl?: string;
     sourceVideoName?: string;
+    sourceVideoKey?: string;
   };
 }
 

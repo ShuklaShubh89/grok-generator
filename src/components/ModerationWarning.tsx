@@ -47,27 +47,6 @@ export default function ModerationWarning({
             </div>
           </div>
 
-          {/* Grok AI Analysis */}
-          {assessment.grokAnalysis && assessment.grokAnalysis.confidence > 0 && (
-            <div className={`warning-section grok-analysis ${assessment.grokAnalysis.safe ? 'grok-safe' : 'grok-unsafe'}`}>
-              <strong>🤖 Grok AI Analysis:</strong>
-              <p className="grok-reasoning">{assessment.grokAnalysis.reasoning}</p>
-              {assessment.grokAnalysis.issues.length > 0 && (
-                <div className="grok-issues">
-                  <strong>Issues found:</strong>
-                  <ul>
-                    {assessment.grokAnalysis.issues.map((issue, i) => (
-                      <li key={i}>{issue}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="grok-confidence">
-                AI Confidence: {formatPercent(assessment.grokAnalysis.confidence)}
-              </div>
-            </div>
-          )}
-
           {/* Estimated Waste */}
           {estimatedWaste > 0.01 && (
             <div className="warning-section">
@@ -189,4 +168,3 @@ export default function ModerationWarning({
     </div>
   );
 }
-

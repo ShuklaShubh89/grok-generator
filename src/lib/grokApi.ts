@@ -1,19 +1,35 @@
 import { createXai } from "@ai-sdk/xai";
+import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { generateImage } from "ai";
 import { experimental_generateVideo as generateVideo } from "ai";
 import { trackModerationEvent, isModerationError } from "./moderationTracking";
-import { syncApiKey as syncTextModerationApiKey } from "./grokTextModeration";
+import { syncPromptRewriteApiKey } from "./grokPromptRewrite";
 
 /** Captured CDN URLs from the most recent API call. Reset before each generation. */
 let capturedCdnUrls: string[] = [];
+export interface XaiApiErrorTrace {
+  url: string;
+  method: string;
+  status: number;
+  body: string;
+}
+
+let lastXaiApiErrorTrace: XaiApiErrorTrace | null = null;
 
 let userApiKey: string | null = null;
 
 /** Set the API key from the UI input (overrides env). Pass null to clear. */
 export function setGrokApiKey(key: string | null): void {
   userApiKey = key?.trim() || null;
-  // Sync with text moderation module
-  syncTextModerationApiKey(userApiKey);
+  syncPromptRewriteApiKey(userApiKey);
+}
+
+export function clearLastXaiApiErrorTrace(): void {
+  lastXaiApiErrorTrace = null;
+}
+
+export function getLastXaiApiErrorTrace(): XaiApiErrorTrace | null {
+  return lastXaiApiErrorTrace;
 }
 
 function getApiKey(): string {
@@ -31,15 +47,42 @@ function useProxy(url: string): boolean {
 }
 
 /** Custom fetch so requests to imgen.x.ai and vidgen.x.ai go via our proxy (avoids CORS). */
-function grokFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+async function grokFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
+  const method =
+    init?.method ??
+    (input instanceof Request ? input.method : "GET");
+
   if (useProxy(url)) {
     // Capture the original CDN URL before proxying
     capturedCdnUrls.push(url);
     const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     return fetch(proxyUrl, init);
   }
-  return fetch(input, init);
+
+  const response = await fetch(input, init);
+
+  const isXaiApiCall = url.startsWith("/v1/") || url.includes("api.x.ai/");
+  if (isXaiApiCall && !response.ok) {
+    try {
+      const body = await response.clone().text();
+      lastXaiApiErrorTrace = {
+        url,
+        method,
+        status: response.status,
+        body,
+      };
+    } catch {
+      lastXaiApiErrorTrace = {
+        url,
+        method,
+        status: response.status,
+        body: "",
+      };
+    }
+  }
+
+  return response;
 }
 
 /** Custom download for generateVideo: fetches video URLs via our proxy to avoid CORS. */
@@ -78,6 +121,21 @@ function dataUriToUint8Array(dataUri: string): Uint8Array {
   const arr = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
   return arr;
+}
+
+async function readApiError(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    if (!text) return `Request failed with status ${response.status}`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string; message?: string };
+      return parsed.error ?? parsed.message ?? text;
+    } catch {
+      return text;
+    }
+  } catch {
+    return `Request failed with status ${response.status}`;
+  }
 }
 
 /**
@@ -251,6 +309,77 @@ export interface VideoResult {
   sourceUrl: string | null;
 }
 
+async function runVideoJob(
+  endpoint: "/videos/edits" | "/videos/extensions",
+  body: Record<string, unknown>,
+  options?: { pollTimeoutMs?: number; pollIntervalMs?: number }
+): Promise<VideoResult> {
+  const baseURL = getBaseUrl();
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${getApiKey()}`,
+  };
+
+  const createResponse = await fetch(`${baseURL}${endpoint}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!createResponse.ok) {
+    throw new Error(await readApiError(createResponse));
+  }
+
+  const createJson = (await createResponse.json()) as { request_id?: string };
+  const requestId = createJson.request_id;
+  if (!requestId) throw new Error("No request_id returned from xAI API.");
+
+  const pollTimeoutMs = options?.pollTimeoutMs ?? 900_000;
+  const pollIntervalMs = options?.pollIntervalMs ?? 5_000;
+  const startTime = Date.now();
+  let statusResponse: { status?: string; video?: { url?: string; duration?: number } } | null = null;
+
+  while (true) {
+    if (Date.now() - startTime > pollTimeoutMs) {
+      throw new Error(`Video job timed out after ${pollTimeoutMs}ms`);
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, pollIntervalMs));
+
+    const statusResponseRaw = await fetch(`${baseURL}/videos/${requestId}`, {
+      headers: { Authorization: `Bearer ${getApiKey()}` },
+    });
+    if (!statusResponseRaw.ok) {
+      throw new Error(await readApiError(statusResponseRaw));
+    }
+
+    statusResponse = (await statusResponseRaw.json()) as { status?: string; video?: { url?: string; duration?: number } };
+
+    if (statusResponse.status === "expired") {
+      throw new Error("Video request expired.");
+    }
+
+    if (statusResponse.status === "failed") {
+      throw new Error("Video request failed.");
+    }
+
+    if (statusResponse.status === "done" || (statusResponse.status == null && statusResponse.video?.url)) {
+      break;
+    }
+  }
+
+  const videoUrl = statusResponse?.video?.url;
+  if (!videoUrl) {
+    throw new Error("Video request completed but no video URL was returned.");
+  }
+
+  const downloaded = await proxyDownload({ url: new URL(videoUrl) });
+  const dataUrl = `data:${downloaded.mediaType ?? "video/mp4"};base64,${convertUint8ArrayToBase64(downloaded.data)}`;
+  const sourceUrl = capturedCdnUrls.length > 0 ? capturedCdnUrls[capturedCdnUrls.length - 1] : videoUrl;
+
+  return { dataUrl, sourceUrl };
+}
+
 /**
  * Image-to-video: send image (data URI) + prompt, returns video as data URL + CDN source URL.
  * Uses Grok SDK (experimental_generateVideo with grok-imagine-video). Polling is handled by the SDK.
@@ -261,6 +390,7 @@ export async function imageToVideo(
   options?: { duration?: number; aspectRatio?: string; resolution?: string }
 ): Promise<VideoResult> {
   try {
+    clearLastXaiApiErrorTrace();
     // Clear captured URLs before generation
     capturedCdnUrls = [];
 
@@ -356,31 +486,92 @@ export async function videoEdit(
   prompt: string,
   sourceVideoUrl: string,
   sourceVideoName?: string | null,
-  options?: { pollTimeoutMs?: number }
+  options?: { pollTimeoutMs?: number; pollIntervalMs?: number }
 ): Promise<VideoResult> {
   try {
+    clearLastXaiApiErrorTrace();
     if (/^(data:|blob:|file:)/i.test(sourceVideoUrl)) {
       throw new Error("xAI video edits require a public, fetchable video URL. Local files need to be uploaded to a hosted URL first.");
+    }
+
+    capturedCdnUrls = [];
+
+    const result = await runVideoJob(
+      "/videos/edits",
+      {
+        model: "grok-imagine-video",
+        prompt,
+        video: { url: sourceVideoUrl },
+      },
+      options
+    );
+
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: sourceVideoName ?? sourceVideoUrl,
+      moderated: false,
+      model: 'grok-imagine-video',
+      metadata: {
+        mode: "edit",
+        sourceVideoUrl,
+        ...(sourceVideoName ? { sourceVideoName } : {}),
+      },
+    });
+
+    return result;
+  } catch (err) {
+    const errorMessage = getErrorMessage(err);
+    const moderated = isModerationError(errorMessage);
+
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: sourceVideoName ?? sourceVideoUrl,
+      moderated,
+      errorMessage,
+      model: 'grok-imagine-video',
+      metadata: {
+        mode: "edit",
+        sourceVideoUrl,
+        ...(sourceVideoName ? { sourceVideoName } : {}),
+      },
+    });
+
+    throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Video extension: send a source video URL + prompt, returns extended video as a data URL + CDN source URL.
+ * Uses xAI's /videos/extensions endpoint directly so the request follows the current extension docs.
+ */
+export async function videoExtend(
+  prompt: string,
+  sourceVideoUrl: string,
+  sourceVideoName?: string | null,
+  options?: { pollTimeoutMs?: number; pollIntervalMs?: number; duration?: number }
+): Promise<VideoResult> {
+  try {
+    clearLastXaiApiErrorTrace();
+    if (/^(data:|blob:|file:)/i.test(sourceVideoUrl)) {
+      throw new Error("xAI video extensions require a public, fetchable video URL. Local files need to be uploaded to a hosted URL first.");
     }
 
     // Clear captured URLs before generation
     capturedCdnUrls = [];
 
-    const { videos } = await generateVideo({
-      model: getXai().video("grok-imagine-video"),
-      prompt,
-      providerOptions: {
-        xai: {
-          videoUrl: sourceVideoUrl,
-          pollTimeoutMs: options?.pollTimeoutMs ?? 1_200_000, // 20 min for edits
-        },
+    const duration = options?.duration ?? 6;
+    const result = await runVideoJob(
+      "/videos/extensions",
+      {
+        model: "grok-imagine-video",
+        prompt,
+        duration,
+        video: { url: sourceVideoUrl },
       },
-      // SDK downloads the video URL with its own fetch (CORS). Use our proxy for vidgen.x.ai.
-      download: proxyDownload,
-    });
-
-    const first = videos?.[0];
-    if (!first) throw new Error("No video in response");
+      options
+    );
 
     // Track successful generation
     trackModerationEvent({
@@ -393,13 +584,11 @@ export async function videoEdit(
         mode: "extend",
         sourceVideoUrl,
         ...(sourceVideoName ? { sourceVideoName } : {}),
+        duration,
       },
     });
 
-    const dataUrl = `data:${first.mediaType};base64,${first.base64}`;
-    const outputSourceUrl = capturedCdnUrls.length > 0 ? capturedCdnUrls[capturedCdnUrls.length - 1] : null;
-
-    return { dataUrl, sourceUrl: outputSourceUrl };
+    return result;
   } catch (err) {
     const errorMessage = getErrorMessage(err);
     const moderated = isModerationError(errorMessage);
@@ -416,6 +605,7 @@ export async function videoEdit(
         mode: "extend",
         sourceVideoUrl,
         ...(sourceVideoName ? { sourceVideoName } : {}),
+        duration: options?.duration ?? 6,
       },
     });
 
