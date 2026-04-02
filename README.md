@@ -25,6 +25,8 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). You’ll be asked to log in with your xAI API key.
 
+By default, API requests use a same-origin `/v1` path that is proxied to `https://api.x.ai/v1` (in both local dev and Vercel) to avoid browser CORS preflight issues.
+
 ### Other commands
 
 - `npm run build` — Build for production (output in `dist/`).

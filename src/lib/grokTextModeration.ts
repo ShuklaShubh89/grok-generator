@@ -14,7 +14,7 @@ function getApiKey(): string {
 }
 
 const getBaseUrl = () =>
-  import.meta.env.VITE_GROK_API_URL ?? "https://api.x.ai/v1";
+  import.meta.env.VITE_GROK_API_URL ?? "/v1";
 
 function getXai() {
   return createXai({
@@ -102,4 +102,3 @@ Be conservative - if unsure, mark as potentially unsafe.`;
 export function syncApiKey(key: string | null): void {
   setGrokTextModerationApiKey(key);
 }
-

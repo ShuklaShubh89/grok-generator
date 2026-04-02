@@ -14,9 +14,10 @@ const DURATION_MAX = 15;
 
 export default function ImageToVideo() {
   const { state, updateImageToVideoState, generateVideo, analyzePrompt } = useAppState();
-  const { preview, prompt, duration, resolution, resultUrl, loading, error } = state.imageToVideo;
+  const { preview, prompt, duration, resolution, resultUrl, sourceUrl, loading, error } = state.imageToVideo;
 
   const [localError, setLocalError] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [confidenceAssessment, setConfidenceAssessment] = useState<RiskAssessment | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [preflightRunning, setPreflightRunning] = useState(false);
@@ -100,6 +101,19 @@ export default function ImageToVideo() {
         <div className="result result-on-top">
           <h2>Result</h2>
           <video src={resultUrl} controls className="result-video" />
+          {sourceUrl && (
+            <button
+              type="button"
+              className="btn-imagine-link"
+              onClick={() => {
+                navigator.clipboard.writeText(sourceUrl);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 2000);
+              }}
+            >
+              {copiedLink ? "✅ Copied!" : "🔗 Copy Imagine Link"}
+            </button>
+          )}
         </div>
       )}
       {loading && !resultUrl && (

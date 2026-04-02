@@ -6,13 +6,11 @@
 // Pricing constants (in USD)
 export const PRICING = {
   image: {
-    // grok-imagine-image pricing
+    // xAI image generation is billed as a flat per-image fee.
     "grok-imagine-image": {
-      input: 0.002,   // Input image cost
-      output: 0.02,   // Output image cost (same for 1K and 2K)
-      total: 0.022,   // Total: $0.002 + $0.02
+      perImage: 0.07,
     },
-    // grok-imagine-image-pro pricing (keeping old value until we get official pricing)
+    // Keep the Pro variant aligned with the current flat pricing model.
     "grok-imagine-image-pro": 0.07,
   },
   video: {
@@ -30,17 +28,15 @@ export const PRICING = {
 
 /**
  * Calculate the cost of generating images
- * For grok-imagine-image: $0.002 (input) + $0.02 (output) = $0.022 per image
- * For grok-imagine-image-pro: $0.07 per image (legacy pricing)
+ * xAI currently bills image generation as a flat per-image fee.
  */
 export function calculateImageCost(
   model: "grok-imagine-image" | "grok-imagine-image-pro",
   count: number
 ): number {
-  if (model === "grok-imagine-image") {
-    return PRICING.image[model].total * count;
-  }
-  return PRICING.image[model] * count;
+  const perImage =
+    model === "grok-imagine-image" ? PRICING.image[model].perImage : PRICING.image[model];
+  return perImage * count;
 }
 
 /**
@@ -90,7 +86,6 @@ export function calculateModeratedVideoCost(
 /**
  * Calculate the moderation fee for a given type and count
  */
-export function calculateModerationFee(type: 'image' | 'video', count: number = 1): number {
+export function calculateModerationFee(_type: 'image' | 'video', count: number = 1): number {
   return PRICING.moderationFee * count;
 }
-

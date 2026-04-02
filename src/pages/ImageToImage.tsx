@@ -10,7 +10,8 @@ import { calculateImageCost } from "../lib/pricing";
 
 export default function ImageToImage() {
   const { state, updateImageToImageState, generateImages, analyzePrompt } = useAppState();
-  const { preview, prompt, model, imageCount, resultUrls, loading, error } = state.imageToImage;
+  const { preview, prompt, model, imageCount, resultUrls, sourceUrls, loading, error } = state.imageToImage;
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [confidenceAssessment, setConfidenceAssessment] = useState<RiskAssessment | null>(null);
@@ -22,7 +23,7 @@ export default function ImageToImage() {
       return;
     }
     setLocalError(null);
-    updateImageToImageState({ resultUrls: [], error: null });
+    updateImageToImageState({ resultUrls: [], sourceUrls: [], error: null });
     const reader = new FileReader();
     reader.onload = () => updateImageToImageState({ preview: reader.result as string });
     reader.readAsDataURL(f);
@@ -67,6 +68,19 @@ export default function ImageToImage() {
             {resultUrls.map((url, idx) => (
               <div key={idx} className="result-grid-item">
                 <img src={url} alt={`Generated ${idx + 1}`} className="result-img" />
+                {sourceUrls[idx] && (
+                  <button
+                    type="button"
+                    className="btn-imagine-link"
+                    onClick={() => {
+                      navigator.clipboard.writeText(sourceUrls[idx]);
+                      setCopiedIdx(idx);
+                      setTimeout(() => setCopiedIdx(null), 2000);
+                    }}
+                  >
+                    {copiedIdx === idx ? "✅ Copied!" : "🔗 Copy Imagine Link"}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -90,20 +104,26 @@ export default function ImageToImage() {
         </label>
 
         <label className="block">
-          <span>Model (Pro = higher quality, 3.2x cost)</span>
+          <span>Model</span>
           <select value={model} onChange={(e) => updateImageToImageState({ model: e.target.value as typeof model })}>
-            <option value="grok-imagine-image">Standard ($0.022/image) - Recommended</option>
+            <option value="grok-imagine-image">Standard ($0.07/image) - Recommended</option>
             <option value="grok-imagine-image-pro">Pro ($0.07/image) - Premium quality</option>
           </select>
         </label>
 
         <label className="block">
-          <span>Number of images to generate</span>
+          <span>Number of images to generate (up to 10)</span>
           <select value={imageCount} onChange={(e) => updateImageToImageState({ imageCount: Number(e.target.value) })}>
             <option value={1}>1 image</option>
             <option value={2}>2 images</option>
             <option value={3}>3 images</option>
             <option value={4}>4 images</option>
+            <option value={5}>5 images</option>
+            <option value={6}>6 images</option>
+            <option value={7}>7 images</option>
+            <option value={8}>8 images</option>
+            <option value={9}>9 images</option>
+            <option value={10}>10 images</option>
           </select>
         </label>
 

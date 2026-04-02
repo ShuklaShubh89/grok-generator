@@ -4,7 +4,7 @@ import { imageEdit, imageToVideo } from "../lib/grokApi";
 import { addToHistory, createThumbnail, createVideoThumbnail } from "../lib/history";
 import { autoSaveFile, generateAutoSaveFilename, isAutoSaveEnabled } from "../lib/autoSave";
 import { assessModerationRiskWithGrok, type RiskAssessment } from "../lib/promptAnalysis";
-import { calculateImageCost, calculateVideoCost } from "../lib/pricing";
+
 
 // State for Image-to-Image page
 interface ImageToImageState {
@@ -13,6 +13,7 @@ interface ImageToImageState {
   model: "grok-imagine-image" | "grok-imagine-image-pro";
   imageCount: number;
   resultUrls: string[];
+  sourceUrls: string[];
   loading: boolean;
   error: string | null;
 }
@@ -24,6 +25,7 @@ interface ImageToVideoState {
   duration: number;
   resolution: "480p" | "720p";
   resultUrl: string | null;
+  sourceUrl: string | null;
   loading: boolean;
   error: string | null;
 }
@@ -48,6 +50,7 @@ const defaultImageToImageState: ImageToImageState = {
   model: "grok-imagine-image",
   imageCount: 1,
   resultUrls: [],
+  sourceUrls: [],
   loading: false,
   error: null,
 };
@@ -58,6 +61,7 @@ const defaultImageToVideoState: ImageToVideoState = {
   duration: 3,
   resolution: "480p",
   resultUrl: null,
+  sourceUrl: null,
   loading: false,
   error: null,
 };
@@ -94,24 +98,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    updateImageToImageState({ loading: true, error: null, resultUrls: [] });
+    updateImageToImageState({ loading: true, error: null, resultUrls: [], sourceUrls: [] });
 
     try {
-      const urls = await imageEdit(prompt.trim(), preview, { model, count: imageCount });
-      updateImageToImageState({ resultUrls: urls, loading: false });
+      const result = await imageEdit(prompt.trim(), preview, { model, count: imageCount });
+      updateImageToImageState({ resultUrls: result.dataUrls, sourceUrls: result.sourceUrls, loading: false });
 
       // Auto-save images if enabled
       if (isAutoSaveEnabled()) {
-        for (let i = 0; i < urls.length; i++) {
-          const filename = generateAutoSaveFilename('image', urls.length > 1 ? i : undefined);
-          await autoSaveFile(urls[i], filename, 'image');
+        for (let i = 0; i < result.dataUrls.length; i++) {
+          const filename = generateAutoSaveFilename('image', result.dataUrls.length > 1 ? i : undefined);
+          await autoSaveFile(result.dataUrls[i], filename, 'image');
         }
       }
 
       // Save to history - this continues even if user navigates away
       try {
         const thumbnail = await createThumbnail(preview, 150);
-        for (const url of urls) {
+        for (const url of result.dataUrls) {
           addToHistory({
             type: "image",
             prompt: prompt.trim(),
@@ -119,7 +123,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             resultUrl: url,
             metadata: {
               model,
-              imageCount: urls.length,
+              imageCount: result.dataUrls.length,
             },
           });
         }
@@ -143,22 +147,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    updateImageToVideoState({ loading: true, error: null, resultUrl: null });
+    updateImageToVideoState({ loading: true, error: null, resultUrl: null, sourceUrl: null });
 
     try {
-      const url = await imageToVideo(prompt.trim(), preview, { duration, resolution });
-      updateImageToVideoState({ resultUrl: url, loading: false });
+      const result = await imageToVideo(prompt.trim(), preview, { duration, resolution });
+      updateImageToVideoState({ resultUrl: result.dataUrl, sourceUrl: result.sourceUrl, loading: false });
 
       // Auto-save video if enabled
       if (isAutoSaveEnabled()) {
         const filename = generateAutoSaveFilename('video');
-        await autoSaveFile(url, filename, 'video');
+        await autoSaveFile(result.dataUrl, filename, 'video');
       }
 
       // Save to history - this continues even if user navigates away
       try {
         const inputThumbnail = await createThumbnail(preview, 150);
-        const videoThumbnail = await createVideoThumbnail(url, 200);
+        const videoThumbnail = await createVideoThumbnail(result.dataUrl, 200);
         addToHistory({
           type: "video",
           prompt: prompt.trim(),

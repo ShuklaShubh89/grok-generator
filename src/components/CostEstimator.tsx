@@ -36,18 +36,11 @@ export default function CostEstimator({
       <div className="cost-estimator-details">
         {type === "image" ? (
           <>
-            {model === "grok-imagine-image" ? (
-              <span className="cost-detail">
-                {imageCount} image{imageCount > 1 ? "s" : ""} × ($0.002 input + $0.02 output) = ${(PRICING.image[model].total * imageCount).toFixed(3)}
-              </span>
-            ) : (
-              <>
-                <span className="cost-detail">
-                  {imageCount} image{imageCount > 1 ? "s" : ""} × ${PRICING.image[model].toFixed(2)}
-                </span>
-                <span className="cost-detail-note">Pro model (3.2× standard)</span>
-              </>
-            )}
+            <span className="cost-detail">
+              {imageCount} image{imageCount > 1 ? "s" : ""} × $
+              {(model === "grok-imagine-image" ? PRICING.image[model].perImage : PRICING.image[model]).toFixed(2)}
+            </span>
+            <span className="cost-detail-note">xAI bills image generation as a flat per-image fee.</span>
           </>
         ) : (
           <>
@@ -63,4 +56,3 @@ export default function CostEstimator({
     </div>
   );
 }
-

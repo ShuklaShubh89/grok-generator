@@ -73,9 +73,9 @@ export function isModerationError(errorMessage: string): boolean {
  */
 function getCost(type: 'image' | 'video', model?: string): number {
   if (type === 'image') {
+    // xAI bills image generation as a flat per-image fee.
     if (model === 'grok-imagine-image-pro') return 0.07;
-    // grok-imagine-image: $0.002 (input) + $0.02 (output) = $0.022
-    return 0.022;
+    return 0.07;
   }
   // Average video cost: image input + 3s @ 480p
   return 0.002 + (0.05 * 3); // $0.152
@@ -183,4 +183,3 @@ export function getModerationStats(): ModerationStats {
 export function clearModerationHistory(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
-

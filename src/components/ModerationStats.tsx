@@ -36,11 +36,12 @@ export default function ModerationStats({ filterType }: ModerationStatsProps) {
     if (!stats) return null;
 
     if (filterType === 'image') {
+      const perImage = PRICING.image["grok-imagine-image"].perImage;
       return {
         totalAttempts: stats.imageAttempts,
         totalModerated: stats.imageModerated,
-        totalCost: stats.imageAttempts * PRICING.image["grok-imagine-image"].total, // $0.022 per image
-        totalWasted: stats.imageModerated * PRICING.image["grok-imagine-image"].total, // $0.022 per image
+        totalCost: stats.imageAttempts * perImage,
+        totalWasted: stats.imageModerated * perImage,
         moderationRate: stats.imageModerationRate,
       };
     } else if (filterType === 'video') {
@@ -120,7 +121,7 @@ export default function ModerationStats({ filterType }: ModerationStatsProps) {
         ℹ️ Moderated content costs include generation fee + $0.05 moderation fee
       </div>
 
-      {showDetails && !filterType && (
+      {showDetails && !filterType && stats && (
         <div className="moderation-stats-details">
           <div className="stats-section">
             <h4>🖼️ Image Generation</h4>
@@ -190,4 +191,3 @@ export default function ModerationStats({ filterType }: ModerationStatsProps) {
     </div>
   );
 }
-

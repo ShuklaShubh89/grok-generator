@@ -4,6 +4,9 @@ import { experimental_generateVideo as generateVideo } from "ai";
 import { trackModerationEvent, isModerationError } from "./moderationTracking";
 import { syncApiKey as syncTextModerationApiKey } from "./grokTextModeration";
 
+/** Captured CDN URLs from the most recent API call. Reset before each generation. */
+let capturedCdnUrls: string[] = [];
+
 let userApiKey: string | null = null;
 
 /** Set the API key from the UI input (overrides env). Pass null to clear. */
@@ -19,7 +22,7 @@ function getApiKey(): string {
 }
 
 const getBaseUrl = () =>
-  import.meta.env.VITE_GROK_API_URL ?? "https://api.x.ai/v1";
+  import.meta.env.VITE_GROK_API_URL ?? "/v1";
 
 const XAI_CDN_PREFIXES = ["https://imgen.x.ai/", "https://vidgen.x.ai/"];
 
@@ -31,6 +34,8 @@ function useProxy(url: string): boolean {
 function grokFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
   if (useProxy(url)) {
+    // Capture the original CDN URL before proxying
+    capturedCdnUrls.push(url);
     const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     return fetch(proxyUrl, init);
   }
@@ -43,6 +48,10 @@ async function proxyDownload(options: {
   abortSignal?: AbortSignal;
 }): Promise<{ data: Uint8Array; mediaType: string | undefined }> {
   const href = options.url.href;
+  // Capture the original CDN URL before proxying
+  if (useProxy(href)) {
+    capturedCdnUrls.push(href);
+  }
   const url = useProxy(href)
     ? `/api/proxy-image?url=${encodeURIComponent(href)}`
     : href;
@@ -164,19 +173,27 @@ function getErrorMessage(err: unknown): string {
   return "Request failed";
 }
 
+export interface ImageEditResult {
+  dataUrls: string[];
+  sourceUrls: string[];
+}
+
 /**
- * Image edit: send image (data URI or URL) + prompt, returns image(s) as data URL(s).
+ * Image edit: send image (data URI or URL) + prompt, returns image(s) as data URL(s) + CDN source URLs.
  * Uses Grok SDK (generateImage with grok-imagine-image or grok-imagine-image-pro).
  */
 export async function imageEdit(
   prompt: string,
   imageDataUri: string,
   options?: { model?: "grok-imagine-image" | "grok-imagine-image-pro"; count?: number }
-): Promise<string[]> {
+): Promise<ImageEditResult> {
   const modelName = options?.model ?? "grok-imagine-image";
   const imageCount = options?.count ?? 1;
 
   try {
+    // Clear captured URLs before generation
+    capturedCdnUrls = [];
+
     // Compress image before sending to API to reduce costs
     const compressed = await compressImage(imageDataUri, 1024, 0.85);
 
@@ -190,6 +207,7 @@ export async function imageEdit(
         text: prompt,
         images: [imageInput],
       },
+      maxImagesPerCall: 10,
       n: imageCount,
     });
 
@@ -205,7 +223,10 @@ export async function imageEdit(
       metadata: { count: imageCount },
     });
 
-    return images.map((img) => `data:${img.mediaType};base64,${img.base64}`);
+    const dataUrls = images.map((img) => `data:${img.mediaType};base64,${img.base64}`);
+    const sourceUrls = [...capturedCdnUrls];
+
+    return { dataUrls, sourceUrls };
   } catch (err) {
     const errorMessage = getErrorMessage(err);
     const moderated = isModerationError(errorMessage);
@@ -225,16 +246,24 @@ export async function imageEdit(
   }
 }
 
+export interface VideoResult {
+  dataUrl: string;
+  sourceUrl: string | null;
+}
+
 /**
- * Image-to-video: send image (data URI) + prompt, returns video as data URL.
+ * Image-to-video: send image (data URI) + prompt, returns video as data URL + CDN source URL.
  * Uses Grok SDK (experimental_generateVideo with grok-imagine-video). Polling is handled by the SDK.
  */
 export async function imageToVideo(
   prompt: string,
   imageDataUri: string,
   options?: { duration?: number; aspectRatio?: string; resolution?: string }
-): Promise<string> {
+): Promise<VideoResult> {
   try {
+    // Clear captured URLs before generation
+    capturedCdnUrls = [];
+
     // Compress image before sending to API to reduce costs
     const compressed = await compressImage(imageDataUri, 1024, 0.85);
 
@@ -292,7 +321,10 @@ export async function imageToVideo(
       },
     });
 
-    return `data:${first.mediaType};base64,${first.base64}`;
+    const dataUrl = `data:${first.mediaType};base64,${first.base64}`;
+    const sourceUrl = capturedCdnUrls.length > 0 ? capturedCdnUrls[capturedCdnUrls.length - 1] : null;
+
+    return { dataUrl, sourceUrl };
   } catch (err) {
     const errorMessage = getErrorMessage(err);
     const moderated = isModerationError(errorMessage);

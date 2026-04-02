@@ -25,7 +25,7 @@ export async function runPreflightCheck(
 
   try {
     // Generate minimal video: 1 second, 480p (lowest supported resolution)
-    const testVideoUrl = await imageToVideo(prompt, imageDataUri, {
+    const result = await imageToVideo(prompt, imageDataUri, {
       duration: 1,
       resolution: "480p",
     });
@@ -34,7 +34,7 @@ export async function runPreflightCheck(
     return {
       success: true,
       passed: true,
-      testVideoUrl,
+      testVideoUrl: result.dataUrl,
       cost: preflightCost,
     };
   } catch (err) {

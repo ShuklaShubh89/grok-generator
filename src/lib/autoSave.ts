@@ -8,6 +8,18 @@ export function isAutoSaveSupported(): boolean {
   return 'showDirectoryPicker' in window && 'indexedDB' in window;
 }
 
+type WindowWithDirectoryPicker = Window & {
+  showDirectoryPicker: (options?: {
+    mode?: 'read' | 'readwrite';
+    startIn?: FileSystemDirectoryHandle | 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos';
+  }) => Promise<FileSystemDirectoryHandle>;
+};
+
+type DirectoryHandleWithPermissions = FileSystemDirectoryHandle & {
+  queryPermission: (descriptor: { mode: 'read' | 'readwrite' }) => Promise<PermissionState>;
+  requestPermission: (descriptor: { mode: 'read' | 'readwrite' }) => Promise<PermissionState>;
+};
+
 // Store the directory handle in memory
 let directoryHandle: FileSystemDirectoryHandle | null = null;
 
@@ -100,7 +112,8 @@ export async function selectAutoSaveFolder(): Promise<boolean> {
 
   try {
     // Request directory access
-    const handle = await window.showDirectoryPicker({
+    const picker = window as unknown as WindowWithDirectoryPicker;
+    const handle = await picker.showDirectoryPicker({
       mode: 'readwrite',
       startIn: 'downloads',
     });
@@ -165,7 +178,7 @@ export async function initializeAutoSave(): Promise<void> {
     }
 
     // Verify we still have permission to access the directory
-    const permission = await handle.queryPermission({ mode: 'readwrite' });
+    const permission = await (handle as DirectoryHandleWithPermissions).queryPermission({ mode: 'readwrite' });
 
     if (permission === 'granted') {
       // Permission already granted, restore the handle
@@ -173,7 +186,7 @@ export async function initializeAutoSave(): Promise<void> {
       console.log('Auto-save directory restored:', handle.name);
     } else if (permission === 'prompt') {
       // Need to request permission again
-      const newPermission = await handle.requestPermission({ mode: 'readwrite' });
+      const newPermission = await (handle as DirectoryHandleWithPermissions).requestPermission({ mode: 'readwrite' });
       if (newPermission === 'granted') {
         directoryHandle = handle;
         console.log('Auto-save directory restored with new permission:', handle.name);
@@ -269,4 +282,3 @@ export function generateAutoSaveFilename(type: 'image' | 'video', index?: number
   const extension = type === 'image' ? 'jpg' : 'mp4';
   return `grok-${type}-${timestamp}${suffix}.${extension}`;
 }
-
