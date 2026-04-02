@@ -40,6 +40,20 @@ export function calculateImageCost(
 }
 
 /**
+ * Calculate the cost of editing images with xAI.
+ * The docs state that image editing is billed for both the input image and the output image.
+ */
+export function calculateImageEditCost(
+  model: "grok-imagine-image" | "grok-imagine-image-pro",
+  outputCount: number,
+  inputCount: number = 1
+): number {
+  const perImage =
+    model === "grok-imagine-image" ? PRICING.image[model].perImage : PRICING.image[model];
+  return perImage * (inputCount + outputCount);
+}
+
+/**
  * Calculate the cost of generating a video
  * Formula: image input cost + (duration × per-second rate based on resolution)
  */
@@ -67,7 +81,7 @@ export function calculateModeratedImageCost(
   model: "grok-imagine-image" | "grok-imagine-image-pro",
   count: number
 ): number {
-  const generationCost = calculateImageCost(model, count);
+  const generationCost = calculateImageEditCost(model, count);
   return generationCost + (PRICING.moderationFee * count);
 }
 

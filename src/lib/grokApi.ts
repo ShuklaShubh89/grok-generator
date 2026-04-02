@@ -316,6 +316,7 @@ export async function imageToVideo(
       moderated: false,
       model: 'grok-imagine-video',
       metadata: {
+        mode: "generate",
         duration: options?.duration ?? 3,
         resolution: options?.resolution ?? '480p',
       },
@@ -340,6 +341,81 @@ export async function imageToVideo(
       metadata: {
         duration: options?.duration ?? 3,
         resolution: options?.resolution ?? '480p',
+      },
+    });
+
+    throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Video editing / extension: send a source video URL + prompt, returns edited video as a data URL + CDN source URL.
+ * xAI keeps the source video's duration, aspect ratio, and resolution for edits.
+ */
+export async function videoEdit(
+  prompt: string,
+  sourceVideoUrl: string,
+  sourceVideoName?: string | null,
+  options?: { pollTimeoutMs?: number }
+): Promise<VideoResult> {
+  try {
+    if (/^(data:|blob:|file:)/i.test(sourceVideoUrl)) {
+      throw new Error("xAI video edits require a public, fetchable video URL. Local files need to be uploaded to a hosted URL first.");
+    }
+
+    // Clear captured URLs before generation
+    capturedCdnUrls = [];
+
+    const { videos } = await generateVideo({
+      model: getXai().video("grok-imagine-video"),
+      prompt,
+      providerOptions: {
+        xai: {
+          videoUrl: sourceVideoUrl,
+          pollTimeoutMs: options?.pollTimeoutMs ?? 1_200_000, // 20 min for edits
+        },
+      },
+      // SDK downloads the video URL with its own fetch (CORS). Use our proxy for vidgen.x.ai.
+      download: proxyDownload,
+    });
+
+    const first = videos?.[0];
+    if (!first) throw new Error("No video in response");
+
+    // Track successful generation
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: sourceVideoName ?? sourceVideoUrl,
+      moderated: false,
+      model: 'grok-imagine-video',
+      metadata: {
+        mode: "extend",
+        sourceVideoUrl,
+        ...(sourceVideoName ? { sourceVideoName } : {}),
+      },
+    });
+
+    const dataUrl = `data:${first.mediaType};base64,${first.base64}`;
+    const outputSourceUrl = capturedCdnUrls.length > 0 ? capturedCdnUrls[capturedCdnUrls.length - 1] : null;
+
+    return { dataUrl, sourceUrl: outputSourceUrl };
+  } catch (err) {
+    const errorMessage = getErrorMessage(err);
+    const moderated = isModerationError(errorMessage);
+
+    // Track moderation event
+    trackModerationEvent({
+      type: 'video',
+      prompt,
+      inputImage: sourceVideoName ?? sourceVideoUrl,
+      moderated,
+      errorMessage,
+      model: 'grok-imagine-video',
+      metadata: {
+        mode: "extend",
+        sourceVideoUrl,
+        ...(sourceVideoName ? { sourceVideoName } : {}),
       },
     });
 

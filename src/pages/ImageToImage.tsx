@@ -6,7 +6,7 @@ import ModerationStats from "../components/ModerationStats";
 import ModerationConfidence from "../components/ModerationConfidence";
 import { useAppState } from "../context/AppStateContext";
 import type { RiskAssessment } from "../lib/promptAnalysis";
-import { calculateImageCost } from "../lib/pricing";
+import { calculateImageEditCost } from "../lib/pricing";
 
 export default function ImageToImage() {
   const { state, updateImageToImageState, generateImages, analyzePrompt } = useAppState();
@@ -44,7 +44,7 @@ export default function ImageToImage() {
     setLocalError(null);
 
     try {
-      const totalCost = calculateImageCost(model, imageCount);
+      const totalCost = calculateImageEditCost(model, imageCount);
       const assessment = await analyzePrompt(prompt.trim(), 'image', totalCost);
       setConfidenceAssessment(assessment);
     } catch (err) {
@@ -112,7 +112,7 @@ export default function ImageToImage() {
         </label>
 
         <label className="block">
-          <span>Number of images to generate (up to 10)</span>
+          <span>Number of output images to generate (up to 10)</span>
           <select value={imageCount} onChange={(e) => updateImageToImageState({ imageCount: Number(e.target.value) })}>
             <option value={1}>1 image</option>
             <option value={2}>2 images</option>
@@ -126,6 +126,10 @@ export default function ImageToImage() {
             <option value={10}>10 images</option>
           </select>
         </label>
+
+        <p className="cost-detail-note">
+          xAI bills image edits for the source image plus each generated output image.
+        </p>
 
         <ImageUpload preview={preview} onFileSelect={onFileSelect} />
 

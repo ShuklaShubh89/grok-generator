@@ -37,11 +37,12 @@ export default function ModerationStats({ filterType }: ModerationStatsProps) {
 
     if (filterType === 'image') {
       const perImage = PRICING.image["grok-imagine-image"].perImage;
+      const editBaseline = perImage * 2; // one source image + one generated output image
       return {
         totalAttempts: stats.imageAttempts,
         totalModerated: stats.imageModerated,
-        totalCost: stats.imageAttempts * perImage,
-        totalWasted: stats.imageModerated * perImage,
+        totalCost: stats.imageAttempts * editBaseline,
+        totalWasted: stats.imageModerated * editBaseline,
         moderationRate: stats.imageModerationRate,
       };
     } else if (filterType === 'video') {

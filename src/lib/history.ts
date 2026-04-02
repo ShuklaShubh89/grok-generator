@@ -13,6 +13,9 @@ export interface HistoryItem {
     resolution?: string;
     model?: string;
     imageCount?: number;
+    mode?: "generate" | "extend";
+    sourceVideoUrl?: string;
+    sourceVideoName?: string;
   };
 }
 
@@ -194,4 +197,3 @@ export function createVideoThumbnail(videoDataUrl: string, maxSize = 200): Promi
     video.src = videoDataUrl;
   });
 }
-

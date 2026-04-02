@@ -227,6 +227,12 @@ export default function History() {
                   {selectedItem.metadata?.model && (
                     <p><strong>Model:</strong> {selectedItem.metadata.model}</p>
                   )}
+                  {selectedItem.metadata?.mode && (
+                    <p><strong>Mode:</strong> {selectedItem.metadata.mode === "extend" ? "Video extension" : "Image to video"}</p>
+                  )}
+                  {selectedItem.metadata?.sourceVideoUrl && (
+                    <p><strong>Source Video:</strong> <a href={selectedItem.metadata.sourceVideoUrl} target="_blank" rel="noreferrer">Open source video</a></p>
+                  )}
                   {selectedItem.metadata?.imageCount && selectedItem.metadata.imageCount > 1 && (
                     <p><strong>Count:</strong> {selectedItem.metadata.imageCount} images</p>
                   )}
@@ -252,4 +258,3 @@ export default function History() {
     </div>
   );
 }
-

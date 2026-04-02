@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { imageEdit, imageToVideo } from "../lib/grokApi";
+import { imageEdit, imageToVideo, videoEdit } from "../lib/grokApi";
 import { addToHistory, createThumbnail, createVideoThumbnail } from "../lib/history";
 import { autoSaveFile, generateAutoSaveFilename, isAutoSaveEnabled } from "../lib/autoSave";
 import { assessModerationRiskWithGrok, type RiskAssessment } from "../lib/promptAnalysis";
@@ -20,7 +20,10 @@ interface ImageToImageState {
 
 // State for Image-to-Video page
 interface ImageToVideoState {
+  mode: "generate" | "extend";
   preview: string | null;
+  sourceVideoUrl: string;
+  sourceVideoName: string | null;
   prompt: string;
   duration: number;
   resolution: "480p" | "720p";
@@ -56,7 +59,10 @@ const defaultImageToImageState: ImageToImageState = {
 };
 
 const defaultImageToVideoState: ImageToVideoState = {
+  mode: "generate",
   preview: null,
+  sourceVideoUrl: "",
+  sourceVideoName: null,
   prompt: "",
   duration: 3,
   resolution: "480p",
@@ -140,17 +146,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   const generateVideo = async () => {
-    const { preview, prompt, duration, resolution } = state.imageToVideo;
+    const { mode, preview, sourceVideoUrl, sourceVideoName, prompt, duration, resolution } = state.imageToVideo;
 
-    if (!preview || !prompt.trim()) {
+    if (!prompt.trim()) {
+      updateImageToVideoState({ error: "Please enter a prompt." });
+      return;
+    }
+
+    if (mode === "generate" && !preview) {
       updateImageToVideoState({ error: "Please upload an image and enter a prompt." });
+      return;
+    }
+
+    if (mode === "extend" && !sourceVideoUrl.trim()) {
+      updateImageToVideoState({ error: "Please provide a source video URL and enter a prompt." });
       return;
     }
 
     updateImageToVideoState({ loading: true, error: null, resultUrl: null, sourceUrl: null });
 
     try {
-      const result = await imageToVideo(prompt.trim(), preview, { duration, resolution });
+      const result =
+        mode === "generate"
+          ? await imageToVideo(prompt.trim(), preview!, { duration, resolution })
+          : await videoEdit(prompt.trim(), sourceVideoUrl.trim(), sourceVideoName, {
+              pollTimeoutMs: 900_000, // 15 min for video extension jobs
+            });
       updateImageToVideoState({ resultUrl: result.dataUrl, sourceUrl: result.sourceUrl, loading: false });
 
       // Auto-save video if enabled
@@ -161,18 +182,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       // Save to history - this continues even if user navigates away
       try {
-        const inputThumbnail = await createThumbnail(preview, 150);
+        const inputThumbnail =
+          mode === "generate"
+            ? await createThumbnail(preview!, 150)
+            : sourceVideoUrl.trim().startsWith("data:")
+              ? await createVideoThumbnail(sourceVideoUrl.trim(), 150)
+              : sourceVideoUrl.trim();
         const videoThumbnail = await createVideoThumbnail(result.dataUrl, 200);
         addToHistory({
           type: "video",
           prompt: prompt.trim(),
           inputImage: inputThumbnail,
           resultUrl: videoThumbnail,
-          metadata: {
-            duration,
-            resolution,
-          },
-        });
+            metadata: {
+              duration,
+              resolution,
+              mode,
+              sourceVideoName: sourceVideoName ?? undefined,
+              ...(mode === "extend" ? { sourceVideoUrl: sourceVideoUrl.trim() } : {}),
+            },
+          });
       } catch (historyErr) {
         console.error("Failed to save to history:", historyErr);
         // Don't fail the whole operation if history save fails
@@ -212,4 +241,3 @@ export function useAppState() {
   }
   return context;
 }
-

@@ -3,6 +3,8 @@
  * Helps users understand what gets moderated and reduce wasted credits.
  */
 
+import { calculateImageEditCost, calculateVideoCost } from "./pricing";
+
 export interface ModerationEvent {
   id: string;
   timestamp: number;
@@ -66,28 +68,33 @@ export function isModerationError(errorMessage: string): boolean {
   return moderationKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
-/**
- * Get cost for a generation type
- * Note: For videos, this returns an average cost estimate (3s @ 480p)
- * since we don't track duration/resolution in moderation events
- */
-function getCost(type: 'image' | 'video', model?: string): number {
-  if (type === 'image') {
-    // xAI bills image generation as a flat per-image fee.
-    if (model === 'grok-imagine-image-pro') return 0.07;
-    return 0.07;
+function getGenerationCost(event: {
+  type: 'image' | 'video';
+  model?: string;
+  metadata?: Record<string, unknown>;
+}): number {
+  if (event.type === 'image') {
+    const count = typeof event.metadata?.count === 'number' ? event.metadata.count : 1;
+    return calculateImageEditCost(event.model === 'grok-imagine-image-pro' ? 'grok-imagine-image-pro' : 'grok-imagine-image', count);
   }
-  // Average video cost: image input + 3s @ 480p
-  return 0.002 + (0.05 * 3); // $0.152
+
+  const duration = typeof event.metadata?.duration === 'number' ? event.metadata.duration : 3;
+  const resolution = event.metadata?.resolution === '720p' ? '720p' : '480p';
+  return calculateVideoCost(duration, resolution);
 }
 
 /**
  * Get the total cost when content is moderated (generation + moderation fee)
  */
-function getModeratedCost(type: 'image' | 'video', model?: string): number {
-  const generationCost = getCost(type, model);
-  const moderationFee = 0.05; // Additional fee for moderated content
-  return generationCost + moderationFee;
+function getModeratedCost(event: {
+  type: 'image' | 'video';
+  model?: string;
+  metadata?: Record<string, unknown>;
+}): number {
+  const generationCost = getGenerationCost(event);
+  const moderationFee = 0.05;
+  const count = event.type === 'image' && typeof event.metadata?.count === 'number' ? event.metadata.count : 1;
+  return generationCost + (moderationFee * count);
 }
 
 /**
@@ -104,7 +111,8 @@ export function trackModerationEvent(event: {
 }): void {
   try {
     const events = getModerationHistory();
-    
+    const outputCount = typeof event.metadata?.count === 'number' ? event.metadata.count : 1;
+
     const newEvent: ModerationEvent = {
       id: `mod_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       timestamp: Date.now(),
@@ -113,10 +121,12 @@ export function trackModerationEvent(event: {
       inputImageHash: hashString(event.inputImage),
       moderated: event.moderated,
       // If moderated, include both generation cost + $0.05 moderation fee
-      cost: event.moderated ? getModeratedCost(event.type, event.model) : getCost(event.type, event.model),
+      cost: event.moderated
+        ? getModeratedCost({ type: event.type, model: event.model, metadata: event.metadata })
+        : getGenerationCost({ type: event.type, model: event.model, metadata: event.metadata }),
       errorMessage: event.errorMessage,
       model: event.model,
-      metadata: event.metadata,
+      metadata: { ...event.metadata, count: outputCount },
     };
     
     events.unshift(newEvent);
